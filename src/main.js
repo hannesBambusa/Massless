@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
@@ -65,7 +65,14 @@ game.command = (name) => {
   if (name === 'approach') ship.approach(t);
   if (name === 'orbit') ship.orbit(t);
   if (name === 'keep') ship.keepAtRange(t);
-  if (name === 'lance') { if (!t.hp) ui.flash('Nothing to unbind there'); else game.lance.toggle(t); }
+  if (name === 'lance') {
+    if (!t.hp) return ui.flash('Nothing to unbind there');
+    game.lance.toggle(t);
+    // out of range: the ship closes in on its own. Wisps get an orbit inside lance range, condensates an approach
+    if (game.lance.on && t.position.distanceTo(ship.position) - t.radius > LANCE.range) {
+      if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, LANCE.range * 0.6)); else ship.approach(t, LANCE.harvestGap);
+    }
+  }
   if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
 };
 /** select obj; if the ship is busy with a target command, re-issue it against the new target */
@@ -193,6 +200,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (game.direct) updateDirect();
+  ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);
   rocks.update(dt, (rock) => {
     game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius));

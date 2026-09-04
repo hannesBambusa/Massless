@@ -22,6 +22,9 @@ export const SHIP = {
   ranges: [15, 30, 60, 120],   // orbit / keep-at-range choices
   defaultRange: 30,
   hull: 100, shield: 60, shieldRegen: 6,
+  glowNear: 35,        // camera distance at which the glow sprites are at full strength
+  glowMin: 0.05,       // floor for the far fade of glow sprites
+  lineMin: 0.3,        // floor for the far fade of strands and motes
 };
 
 export const WARP = {
@@ -68,7 +71,8 @@ export const CAMERA = {
 };
 
 export const LANCE = {
-  range: 60,           // m from the target's surface
+  range: 120,          // m from the target's surface
+  harvestGap: 60,      // auto-close on a condensate stops this far from its surface
   lockTime: 1.2,       // seconds to full lock
   lockDecay: 0.6,      // seconds to lose it once out of range or off
   dps: 22,             // at full lock

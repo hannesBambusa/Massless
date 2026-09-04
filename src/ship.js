@@ -54,7 +54,7 @@ export class Ship {
   // ---- commands (EVE) ----
   goTo(p) { this.cmd = { kind: 'goto', point: p.clone() }; }
   flyToward(dir) { this.cmd = { kind: 'direction', dir: dir.clone().normalize() }; }
-  approach(obj) { this.cmd = { kind: 'approach', obj }; }
+  approach(obj, gap) { this.cmd = { kind: 'approach', obj, gap }; }   // gap: stop this far outside the object (default SHIP.approachGap)
   orbit(obj, range = this.range) { this.cmd = { kind: 'orbit', obj, range }; }
   keepAtRange(obj, range = this.range) { this.cmd = { kind: 'keep', obj, range }; }
   stop() { if (this.cmd.kind === 'warp' && this.cmd.phase !== 'align') return; this.cmd = { kind: 'stop' }; }   // no stopping mid-warp
@@ -84,7 +84,7 @@ export class Ship {
     if (c.kind === 'direct') return out.copy(c.input).multiplyScalar(max);
     if (c.kind === 'goto' || c.kind === 'approach' || c.kind === 'keep') {
       let goal = c.point, stopAt = SHIP.arrive;
-      if (c.kind === 'approach') { goal = c.obj.position; stopAt = c.obj.radius + SHIP.approachGap; }
+      if (c.kind === 'approach') { goal = c.obj.position; stopAt = c.obj.radius + (c.gap ?? SHIP.approachGap); }
       if (c.kind === 'keep') { goal = c.obj.position; stopAt = c.obj.radius + c.range; }
       _r.copy(goal).sub(p); const d = _r.length();
       if (c.kind !== 'keep') {
@@ -210,6 +210,17 @@ export class Ship {
     this._invQ.setFromRotationMatrix(this._inv).normalize();
     this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
     this.warpFx.update(dt, this.warpW, this.warpV);
+    // distance fade: the glow sprites have a fixed world size, so from far away they bloom into a single blob. Scale their
+    // opacity by camera distance. Designs set opacities in their own update; we remember what we applied to tell a fresh value apart.
+    const fade = clamp(SHIP.glowNear / Math.max(1, this.camDist || 0), SHIP.glowMin, 1) * (1 - this.warpW * 0.3);
+    const lineFade = clamp(SHIP.glowNear * 2 / Math.max(1, this.camDist || 0), SHIP.lineMin, 1);   // strands fade gentler so the shape stays readable
+    this.model.group.traverse((o) => {
+      const isSprite = o.isSprite, isLine = (o.isLine || o.isPoints) && o.material.transparent;
+      if (!isSprite && !isLine) return;
+      const u = o.userData, m = o.material, f = isSprite ? fade : lineFade;
+      if (u.applied === undefined || m.opacity !== u.applied) u.base = m.opacity;   // the design wrote a new value this frame
+      m.opacity = u.applied = u.base * f;
+    });
 
   }
 

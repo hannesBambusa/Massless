@@ -22,6 +22,7 @@
       <symbol id="i-warp" viewBox="0 0 24 24"><path d="M4 6l6 6-6 6M11 6l6 6-6 6"/><path d="M18 5v14" opacity=".5"/></symbol>
       <symbol id="i-lance" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.5"/><path d="M7.5 12c3-3 6 3 9 0M7.5 12c3 3 6-3 9 0"/><circle cx="19.5" cy="12" r="2" class="fill"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
+      <symbol id="i-harvest" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity=".8"/></symbol>
       <symbol id="i-track" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" class="fill"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
     </defs>
   </svg>
@@ -74,7 +75,8 @@
         <button data-cmd="orbit" title="Orbit at range (W)"><svg><use href="#i-orbit"/></svg><span>W</span></button>
         <button data-cmd="keep" title="Keep at range (E)"><svg><use href="#i-keep"/></svg><span>E</span></button>
         <button data-cmd="warp" title="Warp to target (S)" class="warp"><svg><use href="#i-warp"/></svg><span>S</span></button>
-        <button data-cmd="lance" id="btn-lance" title="Resonance lance (F)" class="lance"><svg><use href="#i-lance"/></svg><span>F</span></button>
+        <button data-cmd="lance" id="btn-lance" title="Resonance lance (F)" class="lance mob-only"><svg><use href="#i-lance"/></svg><span>F</span></button>
+        <button data-cmd="lance" id="btn-harvest" title="Harvest with the lance (F)" class="lance cloud-only"><svg><use href="#i-harvest"/></svg><span>F</span></button>
         <button id="btn-track" title="Track target with the camera (C)"><svg><use href="#i-track"/></svg><span>C</span></button>
         <button data-cmd="stop" title="Stop (Space)" class="stop"><svg><use href="#i-stop"/></svg><span>␣</span></button>
       </div>

@@ -10,7 +10,7 @@ const el = {
   speed: $('hud-speed'), pos: $('hud-pos'), scrap: $('hud-scrap'), shield: $('bar-shield'), hull: $('bar-hull'), help: $('help'),
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
-  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
   yield: $('yield-num'), yieldMax: $('yield-max'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
@@ -105,10 +105,11 @@ export class UI {
     el.cmdStatus.textContent = ship.describe();
     const lance = this.game.lance;
     el.weapon.textContent = lance.describe();
-    el.lance.classList.toggle('on', lance.on);
+    el.lance.classList.toggle('on', lance.on); el.harvest.classList.toggle('on', lance.on);
 
     const sel = selection.obj;
     el.cmd.classList.toggle('has-target', !!sel);
+    el.cmd.dataset.kind = sel ? sel.kind : 'none';
     if (sel) { el.cmdTitle.textContent = sel.name; el.cmdDist.textContent = fmtDist(sel.position.distanceTo(p) - sel.radius, WORLD.auUnits); }
     else { el.cmdTitle.textContent = 'No target'; el.cmdDist.textContent = ''; }
     el.hp.hidden = !(sel && sel.hpMax);
@@ -118,7 +119,7 @@ export class UI {
     el.gHp.style.strokeDashoffset = 314.2 * (1 - hpF);
     el.gLock.style.strokeDashoffset = 238.8 * (1 - (lance.on && lance.target === sel ? lance.lock : 0));
     el.gSpeed.style.strokeDashoffset = 364.4 * (1 - Math.min(1, ship.speed / SHIP.maxSpeed));
-    this.fx.update(dt, { hp: hpF, lock: lance.on && lance.target === sel ? lance.lock : 0, speed: Math.min(1, ship.speed / SHIP.maxSpeed), selected: !!sel });
+    this.fx.update(dt, { hp: hpF, lock: lance.on && lance.target === sel ? lance.lock : 0, speed: Math.min(1, ship.speed / SHIP.maxSpeed), selected: !!sel, hunting: this.game.mobs.list.some((m) => m.hunting) });
     // the HUD follows what you are dealing with: a condensate = harvest, a wisp or a wisp hunting you = combat, else nav
     const threat = this.game.mobs.list.find((m) => m.hunting && m.position.distanceTo(p) < 120);
     const want = (sel && sel.kind === 'mob') || threat ? 'combat' : sel && sel.kind === 'cloud' ? 'harvest' : 'nav';
@@ -133,13 +134,14 @@ export class UI {
     const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 10);
     const far = this.game.sites.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).sort((a, b) => a[1] - b[1]);
     const hostile = this.game.mobs.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange * 1.5).sort((a, b) => a[1] - b[1]);
-    const keep = new Set();
+    const keep = new Set(), order = [];
     for (const [o, d] of [...far, ...hostile, ...near]) {
       let row = this.rows.get(o);
       if (!row) {
         row = document.createElement('div'); row.className = 'ov-row ' + o.kind;
         row.innerHTML = `<span class="ov-node"></span><span class="ov-name"></span><span class="ov-dist"></span><span class="ov-bar"></span>`;
-        row.addEventListener('click', () => selection.set(o));
+        // select on mouse-down: the list re-sorts while you hold the button, and a moved row would swallow a click
+        row.addEventListener('mousedown', (e) => { if (e.button === 0) selection.set(o); });
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
         row.addEventListener('dblclick', () => { selection.set(o); this.game.command('approach'); });
         this.rows.set(o, row);
@@ -147,8 +149,13 @@ export class UI {
       row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
       row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
-      el.overview.appendChild(row); keep.add(o);
+      keep.add(o); order.push(row);
     }
     for (const [o, row] of this.rows) if (!keep.has(o)) { row.remove(); this.rows.delete(o); }
+    // only move rows when the order really changed, so the list stays still under the pointer
+    const cur = el.overview.children;
+    let same = cur.length === order.length;
+    for (let i = 0; same && i < order.length; i++) if (cur[i] !== order[i]) same = false;
+    if (!same) for (const row of order) el.overview.appendChild(row);
   }
 }

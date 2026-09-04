@@ -60,10 +60,14 @@ export class Asteroids {
       m.rotation.x += m.spin.x * dt; m.rotation.y += m.spin.y * dt; m.rotation.z += m.spin.z * dt;
       if (m.hp <= 0 && !m.dead) { m.dead = true; this.group.remove(m); this.list.splice(i, 1); if (onDeath) onDeath(m); continue; }
       // shiver under the lance: jitter the whole rock and flicker its edges; fades once the beam lets go
+      // drained clouds thin out: the particle cloud and lattice fade with hp, the core shrinks
+      const hpF = m.hp / m.hpMax;
+      m.children[0].material.opacity = 0.25 + 0.6 * hpF;
+      m.children[2].scale.setScalar(0.4 + 0.6 * hpF);
       if (m.shiver > 0) {
         const s = m.shiver, k = 1 + (Math.random() - 0.5) * 0.12 * s;
         m.scale.set(k, 1 + (Math.random() - 0.5) * 0.12 * s, k);
-        m.children[1].material.opacity = Math.min(1, 0.5 + s * 0.6 * Math.random());
+        m.children[1].material.opacity = Math.min(1, 0.3 + s * 0.6 * Math.random());
         m.shiver = Math.max(0, m.shiver - dt * 1.5);
       } else if (m.scale.x !== 1) m.scale.set(1, 1, 1);
     }

@@ -56,7 +56,7 @@ One HUD with three states it morphs between: **Nav** (teal, movement commands fo
 
 ## Weapons
 
-Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F, or the Lance button) is a sustained beam on the selected rock: lock builds over a second while the target stays within 60 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Orbit at 30 to hold the beam.
+Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F, or the Lance button) is a sustained beam on the selected rock: lock builds over a second while the target stays within 120 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Fire it out of range and the ship closes in by itself: an orbit inside lance range for a wisp, an approach for a condensate. The command set follows the target: a condensate shows only Warp, Harvest and Stop; a wisp gets the full suite.
 
 ## Controls
 

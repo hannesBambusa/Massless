@@ -57,39 +57,138 @@ export class HudFx {
   drawCore(ctx, pal, info) {
     const r = this.gauge.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
     const t = this.t, w = this.w, burst = this.burst;
-    const spin = t * (0.25 + w.combat * 0.9 + w.harvest * 0.1);
+    // the hairs only swirl while the HUD is morphing into a state, then settle in place
+    this.spinV = (this.spinV || 0) + ((burst > 0.05 ? 2.2 * burst : 0) - (this.spinV || 0)) * damp(4, dt0);
+    this.spinA = (this.spinA || 0) + this.spinV * dt0;
+    const spin = this.spinA;
     // hairs in water: single hair-thin filaments rooted on the ring, drifting with a slow shared current plus their own
     // travelling waves. Displacement grows toward the tip (f^1.6) so the root barely moves and the tip trails behind.
     const cur = { x: Math.sin(t * 0.37) * 0.6 + Math.sin(t * 0.11) * 0.4, y: Math.cos(t * 0.29) * 0.6 + Math.cos(t * 0.17) * 0.4 };   // the water, changing direction slowly
     const SEG = 26;
     ctx.lineCap = 'round';
+    const tips = [];
     for (const s of this.strands) {
-      const a = s.a + spin * 0.35;
-      const reach = R * (0.6 + 0.5 * w.harvest + 0.3 * w.combat + burst * 0.9) * s.len;
+      const a = s.a + spin;
+      const reach = R * (0.32 + 0.06 * w.harvest + 0.03 * w.combat + burst * 0.5) * s.len;
       const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx;
       const col = pal[s.c];
       ctx.strokeStyle = col; ctx.lineWidth = 0.45 + w.combat * 0.1;  ctx.shadowBlur = 0;
-      ctx.globalAlpha = 0.3 + 0.18 * Math.sin(t * 1.3 * s.sp + s.ph) + burst * 0.4 + (info.selected ? 0.1 : 0);
+      ctx.globalAlpha = (0.3 + 0.18 * Math.sin(t * 1.3 * s.sp + s.ph) + burst * 0.4 + (info.selected ? 0.1 : 0)) * (1 - w.combat * 0.92) * (1 - w.harvest * 0.92);
+      if (ctx.globalAlpha < 0.02) continue;
       ctx.beginPath();
       for (let i = 0; i <= SEG; i++) {
         const f = i / SEG, g = Math.pow(f, 1.6);
         // sideways sway: two travelling waves along the hair, plus the shared current projected on the hair's normal
         const wave = Math.sin(f * 5.5 * s.k - t * 1.7 * s.sp + s.ph) * 0.55 + Math.sin(f * 2.4 - t * 0.9 * s.sp + s.ph * 1.7) * 0.45;
-        const side = (wave * 0.22 * reach + (cur.x * nx + cur.y * ny) * 0.28 * reach * (1 + w.combat * 0.6)) * g;
+        const side = (wave * 0.55 * reach + (cur.x * nx + cur.y * ny) * 0.45 * reach * (1 + w.combat * 0.6)) * g;   // wide sway so neighbours meet
         // the current also bends the hair along its length a little, like drag
         const along = R * 1.03 + reach * f + (cur.x * dx + cur.y * dy) * 0.08 * reach * g;
         const x = cx + dx * along + nx * side, y = cy + dy * along + ny * side;
         i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        if (i === SEG) tips.push({ x, y, s });
       }
       ctx.lineWidth = 2.2; ctx.globalAlpha *= 0.22; ctx.stroke();   // soft halo
       ctx.lineWidth = 0.45 + w.combat * 0.1; ctx.globalAlpha /= 0.22; ctx.stroke();
       // a faint bead near the tip, drifting up and down the hair
       const bf = 0.6 + 0.35 * Math.sin(t * 0.8 * s.sp + s.ph), bg = Math.pow(bf, 1.6);
       const bwave = Math.sin(bf * 5.5 * s.k - t * 1.7 * s.sp + s.ph) * 0.55 + Math.sin(bf * 2.4 - t * 0.9 * s.sp + s.ph * 1.7) * 0.45;
-      const bside = (bwave * 0.22 * reach + (cur.x * nx + cur.y * ny) * 0.28 * reach * (1 + w.combat * 0.6)) * bg;
+      const bside = (bwave * 0.55 * reach + (cur.x * nx + cur.y * ny) * 0.45 * reach * (1 + w.combat * 0.6)) * bg;
       const balong = R * 1.03 + reach * bf + (cur.x * dx + cur.y * dy) * 0.08 * reach * bg;
       ctx.fillStyle = '#fff';  ctx.shadowBlur = 0; ctx.globalAlpha = 0.25 + 0.25 * Math.sin(t * 2.3 + s.ph);
       ctx.beginPath(); ctx.arc(cx + dx * balong + nx * bside, cy + dy * balong + ny * bside, 0.9, 0, TAU); ctx.fill();
+    }
+    // sparks: when two neighbouring hair tips drift close, a short jagged arc jumps between them for a few frames
+    this.arcs = this.arcs || [];
+    const near = R * 0.09;
+    for (let i = 0; i < tips.length; i++) {
+      const a = tips[i], b = tips[(i + 1) % tips.length];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < near && Math.random() < 0.25 && !this.arcs.some((z) => z.i === i)) this.arcs.push({ i, life: rnd(0.12, 0.3), seed: Math.random() * 100 });
+    }
+    for (let k = this.arcs.length - 1; k >= 0; k--) {
+      const z = this.arcs[k]; z.life -= dt0;
+      if (z.life <= 0) { this.arcs.splice(k, 1); continue; }
+      const a = tips[z.i], b = tips[(z.i + 1) % tips.length]; if (!a || !b) continue;
+      ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.5 + 0.5 * Math.random();
+      ctx.beginPath(); ctx.moveTo(a.x, a.y);
+      for (let j = 1; j < 5; j++) { const f = j / 5, jx = a.x + (b.x - a.x) * f, jy = a.y + (b.y - a.y) * f; const n = Math.sin(z.seed + j * 7 + t * 60) * 3; ctx.lineTo(jx + n, jy - n); }
+      ctx.lineTo(b.x, b.y);
+      ctx.lineWidth = 2.4; ctx.globalAlpha *= 0.3; ctx.stroke();
+      ctx.lineWidth = 0.7; ctx.globalAlpha /= 0.3; ctx.stroke();
+    }
+    // harvest: energy is drawn in. Motes spawn beyond the ring and spiral inward into the hub, flashing as they arrive;
+    // faint spiral streams show the pull. Rate follows the lance lock.
+    this.inflow = this.inflow || [];
+    if (w.harvest > 0.2) {
+      const rate = (14 + info.lock * 30) * w.harvest;
+      if (Math.random() < rate * dt0) this.inflow.push({ a: rnd(0, TAU), r: rnd(1.6, 2.1), v: rnd(0.55, 0.9), sp: rnd(1.2, 2.2) * (Math.random() < 0.5 ? 1 : -1), c: Math.random() < 0.7 ? 0 : 2, sz: rnd(0.8, 1.6) });
+      // spiral streams: four arms, slowly turning, brighter near the ring
+      for (let arm = 0; arm < 4; arm++) {
+        ctx.strokeStyle = pal[arm % 2 ? 1 : 0]; ctx.lineWidth = 0.6; ctx.globalAlpha = 0.22 * w.harvest;
+        ctx.beginPath();
+        for (let i = 0; i <= 30; i++) { const f = i / 30, rr = R * (1.02 + 0.95 * f), a = arm * TAU / 4 - f * 2.4 + t * 0.35; const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke();
+      }
+    }
+    for (let k = this.inflow.length - 1; k >= 0; k--) {
+      const m = this.inflow[k];
+      m.r -= m.v * dt0 * (0.6 + (2.1 - m.r));            // accelerates as it nears the hub
+      m.a += m.sp * dt0 * (2.2 - m.r);                    // and spins faster
+      if (m.r <= 1.02) {
+        this.inflow.splice(k, 1);
+        this.flashes = this.flashes || []; this.flashes.push({ a: m.a, life: 0.18 });
+        continue;
+      }
+      const x = cx + Math.cos(m.a) * R * m.r, y = cy + Math.sin(m.a) * R * m.r, col = pal[m.c];
+      ctx.fillStyle = col; ctx.globalAlpha = 0.5 + 0.5 * (2.1 - m.r);
+      ctx.beginPath(); ctx.arc(x, y, m.sz * (0.7 + (2.1 - m.r) * 0.5), 0, TAU); ctx.fill();
+      // short tail behind the mote along its spiral
+      ctx.strokeStyle = col; ctx.lineWidth = 0.7; ctx.globalAlpha *= 0.5;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx + Math.cos(m.a - m.sp * 0.08) * R * (m.r + 0.06), cy + Math.sin(m.a - m.sp * 0.08) * R * (m.r + 0.06)); ctx.stroke();
+    }
+    this.flashes = this.flashes || [];
+    for (let k = this.flashes.length - 1; k >= 0; k--) {
+      const f = this.flashes[k]; f.life -= dt0; if (f.life <= 0) { this.flashes.splice(k, 1); continue; }
+      const x = cx + Math.cos(f.a) * R * 1.02, y = cy + Math.sin(f.a) * R * 1.02;
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = f.life / 0.18;
+      ctx.beginPath(); ctx.arc(x, y, 1.5 + (0.18 - f.life) * 14, 0, TAU); ctx.fill();
+    }
+    // combat: energy arcs out of the hub. Jagged bolts spawn around the ring, live a few frames, some fork once
+    this.bolts = this.bolts || [];
+    if (w.combat > 0.2) {
+      const rate = (10 + info.lock * 18 + (info.hunting ? 8 : 0)) * w.combat;
+      if (Math.random() < rate * dt0) {
+        const a = rnd(0, TAU);
+        this.bolts.push({ a, len: R * rnd(0.35, 0.9), life: rnd(0.06, 0.18), max: 0.18, seed: rnd(0, 100), fork: Math.random() < 0.5, c: Math.random() < 0.6 ? 0 : 2 });
+      }
+    }
+    ctx.lineCap = 'round';
+    for (let k = this.bolts.length - 1; k >= 0; k--) {
+      const b = this.bolts[k]; b.life -= dt0;
+      if (b.life <= 0) { this.bolts.splice(k, 1); continue; }
+      const col = pal[b.c], jag = R * 0.06, N = 7;
+      const dx = Math.cos(b.a), dy = Math.sin(b.a), nx = -dy, ny = dx;
+      const pts = [];
+      for (let i = 0; i <= N; i++) { const f = i / N, off = i === 0 || i === N ? 0 : Math.sin(b.seed + i * 13.7 + t * 90) * jag * (0.4 + f); const along = R * 1.02 + b.len * f; pts.push([cx + dx * along + nx * off, cy + dy * along + ny * off]); }
+      const alpha = Math.min(1, b.life / b.max * 2.2);
+      ctx.strokeStyle = col; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+      ctx.lineWidth = 3; ctx.globalAlpha = 0.18 * alpha; ctx.stroke();
+      ctx.lineWidth = 0.9; ctx.globalAlpha = 0.9 * alpha; ctx.stroke();
+      if (b.fork) {   // one branch off the middle
+        const m = pts[3], fa = b.a + (b.seed % 2 ? 0.7 : -0.7), fl = b.len * 0.45;
+        ctx.beginPath(); ctx.moveTo(m[0], m[1]);
+        for (let i = 1; i <= 4; i++) { const f = i / 4, off = i === 4 ? 0 : Math.sin(b.seed * 3 + i * 9 + t * 80) * jag * 0.5; ctx.lineTo(m[0] + Math.cos(fa) * fl * f - Math.sin(fa) * off, m[1] + Math.sin(fa) * fl * f + Math.cos(fa) * off); }
+        ctx.lineWidth = 0.7; ctx.globalAlpha = 0.6 * alpha; ctx.stroke();
+      }
+      // hot root on the ring
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.8 * alpha; ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], 1.4, 0, TAU); ctx.fill();
+    }
+    // crackle halo just outside the ring while in combat
+    if (w.combat > 0.05) {
+      ctx.strokeStyle = pal[0]; ctx.lineWidth = 1; ctx.globalAlpha = 0.25 * w.combat;
+      ctx.beginPath();
+      for (let i = 0; i <= 90; i++) { const a = i / 90 * TAU, rr = R * 1.04 + Math.sin(a * 11 + t * 25) * R * 0.02 + Math.sin(a * 5 - t * 17) * R * 0.015; const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.closePath(); ctx.stroke();
     }
     // hp / lock as living arcs: a thick soft arc with a bright head that jitters
     ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.lineCap = 'round';

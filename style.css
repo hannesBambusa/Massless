@@ -276,3 +276,10 @@ body[data-hud="harvest"] { --hud-rate: 1.4; }
 .corner { opacity: 0.5; }
 #overview::before, #overview::after { display: none; }
 .ov-row .ov-node::before { opacity: 0.9; }
+
+/* ---------- command set follows the target kind ---------- */
+#cmd[data-kind="cloud"] .cmd-buttons button[data-cmd="approach"], #cmd[data-kind="cloud"] .cmd-buttons button[data-cmd="orbit"], #cmd[data-kind="cloud"] .cmd-buttons button[data-cmd="keep"], #cmd[data-kind="cloud"] #btn-track, #cmd[data-kind="cloud"] .mob-only { display: none; }
+#cmd[data-kind="mob"] .cloud-only, #cmd[data-kind="site"] .cloud-only, #cmd[data-kind="none"] .cloud-only { display: none; }
+#cmd[data-kind="site"] .mob-only, #cmd[data-kind="none"] .mob-only { display: none; }
+#cmd[data-kind="cloud"] .cmd-row #cmd-ranges, #cmd[data-kind="cloud"] .cmd-row .lbl:first-child { display: none; }
+#cmd[data-kind="cloud"] .cmd-buttons button { width: 62px; }
