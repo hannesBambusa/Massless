@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driftline</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="game"></div>
+
+  <div id="topbar">
+    <div class="stat cyan"><span class="lbl">Sector</span><span id="hud-sector">Alpha Reach</span></div>
+    <div class="stat"><span class="lbl">Speed</span><span id="hud-speed">0</span></div>
+    <div class="stat"><span class="lbl">Position</span><span id="hud-pos">0, 0, 0</span></div>
+    <div class="stat gold"><span class="lbl">Scrap</span><span id="hud-scrap">0</span></div>
+    <select id="sel-design" title="Ship design"></select>
+    <button id="btn-mode" title="Toggle command / direct flight (V)">COMMAND</button>
+  </div>
+
+  <div id="target-label" hidden><span id="tl-arrow">➤</span><span id="tl-name"></span><span id="tl-dist"></span></div>
+
+  <div id="overview">
+    <div class="panel-title">Overview</div>
+    <div id="overview-list"></div>
+  </div>
+
+  <div id="cmd">
+    <div class="cmd-head"><span id="cmd-title">No target</span><span id="cmd-dist"></span></div>
+    <div class="cmd-buttons">
+      <button data-cmd="approach" title="Approach (Q)">Approach</button>
+      <button data-cmd="orbit" title="Orbit (W)">Orbit</button>
+      <button data-cmd="keep" title="Keep at range (E)">Keep range</button>
+      <button data-cmd="stop" title="Stop (Space)" class="stop">Stop</button>
+      <button id="btn-track" title="Track target with the camera (C)">Track</button>
+    </div>
+    <div class="cmd-row"><span class="lbl">Range</span><div id="cmd-ranges"></div></div>
+    <div class="cmd-row"><span class="lbl">Throttle</span><input id="throttle" type="range" min="0" max="100" value="100"><span id="throttle-num">100%</span></div>
+    <div id="cmd-status" class="muted">Stopped</div>
+  </div>
+
+  <div id="bars">
+    <div class="bar shield"><span class="lbl">Shield</span><div class="track"><div id="bar-shield" class="fill"></div></div></div>
+    <div class="bar hull"><span class="lbl">Hull</span><div class="track"><div id="bar-hull" class="fill"></div></div></div>
+  </div>
+
+  <div id="help">
+    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>Space</b> stop · <b>V</b> direct mode</span>
+    <span id="help-direct" hidden><b>W / S</b> thrust · <b>A / D</b> strafe · <b>R / F</b> up / down · <b>Wheel</b> zoom · <b>Space</b> stop · <b>V</b> command mode</span>
+    · <b>H</b> hide
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
