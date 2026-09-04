@@ -18,7 +18,7 @@ export class Mobs {
 
   spawn(centre, idx) {
     const g = new THREE.Group();
-    g.position.copy(centre).add(new THREE.Vector3(rnd(-1, 1), rnd(-0.3, 0.3), rnd(-1, 1)).normalize().multiplyScalar(rnd(160, 420)));
+    g.position.copy(centre).add(new THREE.Vector3(rnd(-1, 1), rnd(-0.3, 0.3), rnd(-1, 1)).normalize().multiplyScalar(rnd(300, 520)));
     g.home = g.position.clone(); g.name = `Wisp ${String.fromCharCode(65 + (idx % 26))}-${Math.floor(idx / 26) + 1}`; g.kind = 'mob';
     g.radius = 4; g.hpMax = g.hp = MOB.hp; g.shiver = 0; g.dead = false; g.t = rnd(0, 100); g.phase = rnd(0, TAU);
     g.hit = (dmg, lock) => { g.hp = Math.max(0, g.hp - dmg); g.shiver = Math.max(g.shiver, lock); g.aggro = true; };

@@ -21,7 +21,7 @@ import { keys, bindPointer } from './input.js';
 import { clamp, damp } from './utils.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // retina at 2x doubles the bloom cost for little gain
 renderer.setSize(innerWidth, innerHeight);
 const host = document.getElementById('game');
 host.appendChild(renderer.domElement);
@@ -33,7 +33,7 @@ const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight,
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), BLOOM.strength, BLOOM.radius, BLOOM.threshold);   // bloom at half res is invisible to the eye and half the cost
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 

@@ -44,7 +44,7 @@ svg .fill { fill: currentColor; stroke: none; }
 .chip.on { color: var(--gold); border-color: var(--gold-s); }
 
 /* ---------- overview: a thread with nodes ---------- */
-#overview { position: fixed; right: 18px; top: 84px; width: 250px; z-index: 5; padding: 0 0 6px 0; background: linear-gradient(180deg, rgba(6,12,30,0.35), var(--glass)); backdrop-filter: blur(6px);
+#overview { position: fixed; right: 18px; top: 84px; width: 250px; z-index: 5; padding: 0 0 6px 0; background: linear-gradient(180deg, rgba(6,12,30,0.35), var(--glass)); 
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
 #overview::before { content: ''; position: absolute; left: 21px; top: 44px; bottom: 16px; width: 1px; background: linear-gradient(180deg, var(--gold-d), var(--cyan-d) 40%, rgba(79,242,255,0.08)); }
 .ov-head { display: flex; flex-direction: column; padding: 10px 14px 8px; border-bottom: 1px solid var(--cyan-s); }
@@ -71,7 +71,7 @@ svg .fill { fill: currentColor; stroke: none; }
 
 /* ---------- command: core gauge + command nodes ---------- */
 #cmd { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 14px; padding: 8px 18px 8px 8px;
-  background: linear-gradient(90deg, rgba(6,12,30,0.25), var(--glass) 30%, var(--glass) 70%, rgba(6,12,30,0.25)); backdrop-filter: blur(6px);
+  background: linear-gradient(90deg, rgba(6,12,30,0.25), var(--glass) 30%, var(--glass) 70%, rgba(6,12,30,0.25)); 
   clip-path: polygon(0 50%, 40px 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 40px 100%); }
 body.direct #cmd { display: none; }
 .cmd-gauge { position: relative; width: 132px; height: 132px; flex: none; }
@@ -79,8 +79,8 @@ body.direct #cmd { display: none; }
 .gauge circle { fill: none; stroke-linecap: round; }
 .g-track { stroke: rgba(79,242,255,0.12); stroke-width: 3; }
 .g-track.inner { stroke: rgba(255,209,102,0.10); stroke-width: 2.5; }
-.g-hp { stroke: var(--violet); stroke-width: 3; stroke-dasharray: 326.7; stroke-dashoffset: 326.7; filter: drop-shadow(0 0 4px var(--violet)); transition: stroke-dashoffset 0.15s; }
-.g-lock { stroke: var(--gold); stroke-width: 2.5; stroke-dasharray: 270.2; stroke-dashoffset: 270.2; filter: drop-shadow(0 0 4px var(--gold)); transition: stroke-dashoffset 0.1s; }
+.g-hp { stroke: var(--violet); stroke-width: 3; stroke-dasharray: 326.7; stroke-dashoffset: 326.7;  transition: stroke-dashoffset 0.15s; }
+.g-lock { stroke: var(--gold); stroke-width: 2.5; stroke-dasharray: 270.2; stroke-dashoffset: 270.2;  transition: stroke-dashoffset 0.1s; }
 .g-ticks line { stroke: rgba(79,242,255,0.35); stroke-width: 1; }
 .gauge-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-align: center; padding: 0 22px; pointer-events: none; }
 .gauge-centre #cmd-dist { font-family: var(--font-head); font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; text-shadow: 0 0 10px var(--cyan-d); }
@@ -138,7 +138,7 @@ body.direct #cmd { display: none; }
 #help[hidden], #help span[hidden] { display: none; }
 
 /* ---------- reference kit: corner brackets, tick strips, concentric segmented rings ---------- */
-.corner { position: absolute; width: 14px; height: 14px; border: 1.5px solid var(--teal); pointer-events: none; opacity: 0.9; filter: drop-shadow(0 0 4px rgba(92,230,214,0.6)); }
+.corner { position: absolute; width: 14px; height: 14px; border: 1.5px solid var(--teal); pointer-events: none; opacity: 0.9;  }
 .corner.tl { left: 6px; top: 6px; border-right: none; border-bottom: none; }
 .corner.tr { right: 6px; top: 6px; border-left: none; border-bottom: none; }
 .corner.bl { left: 6px; bottom: 6px; border-right: none; border-top: none; }
@@ -159,9 +159,9 @@ body.direct #cmd { display: none; }
 .g-seg.outer { stroke: var(--lav); stroke-dasharray: 9 4; opacity: 0.45; }
 .g-seg.mid { stroke: var(--teal); stroke-dasharray: 2 4; opacity: 0.55; }
 .g-seg.core { stroke: var(--lav); stroke-width: 6; stroke-dasharray: 22 5; opacity: 0.35; }
-.g-speed { fill: none; stroke: var(--teal); stroke-width: 2; stroke-dasharray: 364.4; stroke-dashoffset: 364.4; stroke-linecap: butt; filter: drop-shadow(0 0 4px var(--teal)); transition: stroke-dashoffset 0.15s; }
+.g-speed { fill: none; stroke: var(--teal); stroke-width: 2; stroke-dasharray: 364.4; stroke-dashoffset: 364.4; stroke-linecap: butt;  transition: stroke-dashoffset 0.15s; }
 .g-track { stroke: rgba(159,140,255,0.15); stroke-width: 4; }
-.g-hp { stroke: var(--lav); stroke-width: 4; stroke-dasharray: 314.2; stroke-dashoffset: 314.2; filter: drop-shadow(0 0 5px var(--lav)); }
+.g-hp { stroke: var(--lav); stroke-width: 4; stroke-dasharray: 314.2; stroke-dashoffset: 314.2;  }
 .g-track.inner { stroke: rgba(255,209,102,0.12); stroke-width: 3; }
 .g-lock { stroke-dasharray: 238.8; stroke-dashoffset: 238.8; stroke-width: 3; }
 .g-ticks line { stroke: rgba(92,230,214,0.45); }
@@ -189,7 +189,7 @@ body.morphing #cmd, body.morphing #overview, body.morphing #topbar, body.morphin
 
 /* glow pass: everything lit from within, panels barely there */
 #cmd, #overview { box-shadow: 0 0 40px rgba(20,60,120,0.25), inset 0 0 40px var(--accent-s); border-color: var(--accent-s); }
-.corner { border-color: var(--accent); filter: drop-shadow(0 0 5px var(--accent-d)); }
+.corner { border-color: var(--accent);  }
 .ticks { background: repeating-linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 7px, var(--lav) 7px 9px, transparent 9px 21px); }
 .ov-title, .brand, .stat.cyan span:last-child, .gauge-centre #cmd-dist, #throttle-num, .cmd-buttons button, .chip, #sel-design { color: var(--accent); }
 .ov-title, .brand, .stat.cyan span:last-child, .gauge-centre #cmd-dist { text-shadow: 0 0 12px var(--accent-d), 0 0 28px var(--accent-s); }
@@ -199,7 +199,7 @@ body.morphing #cmd, body.morphing #overview, body.morphing #topbar, body.morphin
 .stat::before { background: linear-gradient(180deg, transparent, var(--accent-d), transparent); }
 .cmd-buttons button::before { background: var(--accent-s); }
 .cmd-buttons button:hover { background: var(--accent-s); } .cmd-buttons button:hover::before { background: var(--accent); }
-.g-speed { stroke: var(--accent); filter: drop-shadow(0 0 5px var(--accent)); }
+.g-speed { stroke: var(--accent);  }
 .g-seg.mid { stroke: var(--accent); }
 .g-ticks line { stroke: var(--accent-d); }
 #hud-modes { display: flex; gap: 2px; pointer-events: auto; margin-right: 6px; }
@@ -215,9 +215,9 @@ body[data-hud="harvest"] .cmd-buttons button.lance, body[data-hud="harvest"] .cm
 body[data-hud="harvest"] .cmd-buttons button[data-cmd="warp"], body[data-hud="harvest"] .cmd-buttons button[data-cmd="approach"] { opacity: 0.45; }
 body[data-hud="combat"] .cmd-buttons button.lance, body[data-hud="combat"] .cmd-buttons button[data-cmd="keep"], body[data-hud="combat"] #btn-track { transform: scale(1.12); }
 body[data-hud="combat"] .cmd-buttons button[data-cmd="warp"] { opacity: 0.45; }
-body[data-hud="harvest"] .g-hp { stroke: var(--gold); filter: drop-shadow(0 0 5px var(--gold)); }
+body[data-hud="harvest"] .g-hp { stroke: var(--gold);  }
 body[data-hud="harvest"] .g-seg.core { stroke: var(--gold); }
-body[data-hud="combat"] .g-hp { stroke: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
+body[data-hud="combat"] .g-hp { stroke: var(--accent);  }
 body[data-hud="combat"] .g-seg.outer { stroke: var(--accent); opacity: 0.7; animation: pulse 1s ease-in-out infinite; }
 body[data-hud="combat"] #cmd { clip-path: polygon(0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px)); border-radius: 0; }
 body[data-hud="harvest"] #cmd { border-radius: 40px 8px 40px 8px; }
@@ -263,14 +263,7 @@ body[data-hud="harvest"] { --hud-rate: 1.4; }
 .g-seg.outer { animation: rot calc(26s * var(--hud-rate)) linear infinite; }
 .g-seg.mid { animation: rotr calc(14s * var(--hud-rate)) linear infinite; }
 .g-seg.core { animation: rot calc(40s * var(--hud-rate)) linear infinite, corepulse calc(3s * var(--hud-rate)) ease-in-out infinite; }
-.g-ticks { transform-box: fill-box; transform-origin: center; animation: rotr calc(90s * var(--hud-rate)) linear infinite; }
-.corner { animation: bracket calc(3.2s * var(--hud-rate)) ease-in-out infinite; }
-.corner.tr { animation-delay: 0.4s; } .corner.br { animation-delay: 0.8s; } .corner.bl { animation-delay: 1.2s; }
-.ticks { animation: shimmer calc(2.4s * var(--hud-rate)) linear infinite; }
 #overview::after { content: ''; position: absolute; left: 18px; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff, 0 0 14px var(--accent); animation: thread calc(3.6s * var(--hud-rate)) linear infinite; pointer-events: none; }
-.ov-row .ov-bar { background-size: 8px 2px; animation: shimmer calc(1.6s * var(--hud-rate)) linear infinite; }
-.g-track { stroke-dasharray: 20 6; animation: dash calc(4s * var(--hud-rate)) linear infinite; }
-.g-track.inner { stroke-dasharray: 12 5; animation: dash calc(6s * var(--hud-rate)) linear infinite reverse; }
 .brand-core { animation-duration: calc(2.4s * var(--hud-rate)); }
 .bar .fill { animation-duration: calc(3s * var(--hud-rate)); }
 #topbar::after { animation-duration: calc(6s * var(--hud-rate)); }

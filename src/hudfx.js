@@ -3,7 +3,7 @@
 // Forms per state: nav = calm bloom, harvest = petals reach toward the yield block, combat = sharp lance spikes.
 import { rnd, TAU, damp, clamp } from './utils.js';
 
-const STRANDS = 14, MOTES = 46, THREAD_SPARKS = 10, EDGE_MOTES = 24;
+const STRANDS = 30, MOTES = 30, THREAD_SPARKS = 8, EDGE_MOTES = 14;
 const PALETTE = {
   nav: ['#5ce6d6', '#9be7ff', '#ffffff', '#9f8cff'],
   harvest: ['#ffd166', '#ffb347', '#ffffff', '#5ce6d6'],
@@ -16,7 +16,7 @@ export class HudFx {
     document.body.appendChild(this.cv);
     this.ctx = this.cv.getContext('2d');
     this.t = 0; this.state = 'nav'; this.w = { nav: 1, harvest: 0, combat: 0 }; this.burst = 0;
-    this.strands = Array.from({ length: STRANDS }, (_, i) => ({ a: i / STRANDS * TAU, ph: rnd(0, TAU), sp: rnd(0.6, 1.3), len: rnd(0.8, 1.1), c: i % 4 }));
+    this.strands = Array.from({ length: STRANDS }, (_, i) => ({ a: i / STRANDS * TAU + rnd(-0.05, 0.05), ph: rnd(0, TAU), sp: rnd(0.5, 1.1), len: rnd(0.55, 1.25), c: i % 4, k: rnd(0.7, 1.3) }));
     this.motes = Array.from({ length: MOTES }, () => ({ a: rnd(0, TAU), r: rnd(0.5, 1.4), w: rnd(0.3, 1.2) * (Math.random() < 0.5 ? 1 : -1), s: rnd(1, 2.4), c: Math.floor(rnd(0, 4)) }));
     this.sparks = Array.from({ length: THREAD_SPARKS }, () => ({ t: Math.random(), v: rnd(0.08, 0.2) }));
     this.edge = Array.from({ length: EDGE_MOTES }, () => ({ t: Math.random(), v: rnd(0.03, 0.08), o: rnd(-3, 3) }));
@@ -58,25 +58,41 @@ export class HudFx {
     const r = this.gauge.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
     const t = this.t, w = this.w, burst = this.burst;
     const spin = t * (0.25 + w.combat * 0.9 + w.harvest * 0.1);
+    // hairs in water: single hair-thin filaments rooted on the ring, drifting with a slow shared current plus their own
+    // travelling waves. Displacement grows toward the tip (f^1.6) so the root barely moves and the tip trails behind.
+    const cur = { x: Math.sin(t * 0.37) * 0.6 + Math.sin(t * 0.11) * 0.4, y: Math.cos(t * 0.29) * 0.6 + Math.cos(t * 0.17) * 0.4 };   // the water, changing direction slowly
+    const SEG = 26;
+    ctx.lineCap = 'round';
     for (const s of this.strands) {
-      const a = s.a + spin + Math.sin(t * s.sp + s.ph) * 0.08;
-      // petal: a loop from the ring outward and back. bloom = round petal, harvest = long reaching petal, combat = thin spike
-      const reach = R * (0.55 + 0.45 * w.harvest + 0.35 * w.combat + burst * 0.9) * s.len * (1 + 0.08 * Math.sin(t * 2 * s.sp + s.ph));
-      const width = R * (0.42 * w.nav + 0.28 * w.harvest + 0.1 * w.combat) * (1 + burst * 0.4);
-      const bx = cx + Math.cos(a) * R * 1.02, by = cy + Math.sin(a) * R * 1.02;
-      const tx = cx + Math.cos(a) * (R + reach), ty = cy + Math.sin(a) * (R + reach);
-      const nx = -Math.sin(a), ny = Math.cos(a);
-      ctx.beginPath(); ctx.moveTo(bx, by);
-      ctx.bezierCurveTo(bx + nx * width, by + ny * width, tx + nx * width * 0.3, ty + ny * width * 0.3, tx, ty);
-      ctx.bezierCurveTo(tx - nx * width * 0.3, ty - ny * width * 0.3, bx - nx * width, by - ny * width, bx, by);
+      const a = s.a + spin * 0.35;
+      const reach = R * (0.6 + 0.5 * w.harvest + 0.3 * w.combat + burst * 0.9) * s.len;
+      const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx;
       const col = pal[s.c];
-      ctx.strokeStyle = col; ctx.lineWidth = 1 + w.combat * 0.4; ctx.shadowColor = col; ctx.shadowBlur = 10 + burst * 14;
-      ctx.globalAlpha = 0.28 + 0.22 * Math.sin(t * 3 * s.sp + s.ph) + burst * 0.4 + (info.selected ? 0.12 : 0);
-      ctx.stroke();
-      ctx.globalAlpha = 0.05 + w.harvest * 0.06; ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 0.45 + w.combat * 0.1;  ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.3 + 0.18 * Math.sin(t * 1.3 * s.sp + s.ph) + burst * 0.4 + (info.selected ? 0.1 : 0);
+      ctx.beginPath();
+      for (let i = 0; i <= SEG; i++) {
+        const f = i / SEG, g = Math.pow(f, 1.6);
+        // sideways sway: two travelling waves along the hair, plus the shared current projected on the hair's normal
+        const wave = Math.sin(f * 5.5 * s.k - t * 1.7 * s.sp + s.ph) * 0.55 + Math.sin(f * 2.4 - t * 0.9 * s.sp + s.ph * 1.7) * 0.45;
+        const side = (wave * 0.22 * reach + (cur.x * nx + cur.y * ny) * 0.28 * reach * (1 + w.combat * 0.6)) * g;
+        // the current also bends the hair along its length a little, like drag
+        const along = R * 1.03 + reach * f + (cur.x * dx + cur.y * dy) * 0.08 * reach * g;
+        const x = cx + dx * along + nx * side, y = cy + dy * along + ny * side;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.lineWidth = 2.2; ctx.globalAlpha *= 0.22; ctx.stroke();   // soft halo
+      ctx.lineWidth = 0.45 + w.combat * 0.1; ctx.globalAlpha /= 0.22; ctx.stroke();
+      // a faint bead near the tip, drifting up and down the hair
+      const bf = 0.6 + 0.35 * Math.sin(t * 0.8 * s.sp + s.ph), bg = Math.pow(bf, 1.6);
+      const bwave = Math.sin(bf * 5.5 * s.k - t * 1.7 * s.sp + s.ph) * 0.55 + Math.sin(bf * 2.4 - t * 0.9 * s.sp + s.ph * 1.7) * 0.45;
+      const bside = (bwave * 0.22 * reach + (cur.x * nx + cur.y * ny) * 0.28 * reach * (1 + w.combat * 0.6)) * bg;
+      const balong = R * 1.03 + reach * bf + (cur.x * dx + cur.y * dy) * 0.08 * reach * bg;
+      ctx.fillStyle = '#fff';  ctx.shadowBlur = 0; ctx.globalAlpha = 0.25 + 0.25 * Math.sin(t * 2.3 + s.ph);
+      ctx.beginPath(); ctx.arc(cx + dx * balong + nx * bside, cy + dy * balong + ny * bside, 0.9, 0, TAU); ctx.fill();
     }
     // hp / lock as living arcs: a thick soft arc with a bright head that jitters
-    ctx.globalAlpha = 1; ctx.shadowBlur = 14; ctx.lineCap = 'round';
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.lineCap = 'round';
     if (info.selected) {
       this.arc(ctx, cx, cy, R * 0.86, info.hp, pal[1 + (this.state === 'harvest' ? -1 : 0)], 3);
       if (info.lock > 0) this.arc(ctx, cx, cy, R * 0.66, info.lock, pal[2], 2.5, true);
@@ -87,7 +103,7 @@ export class HudFx {
       m.a += m.w * dt0 * (1 + w.combat);
       const rr = R * (0.55 + m.r * (0.5 + w.harvest * 0.5 + burst)) * (1 + 0.06 * Math.sin(t * m.s));
       const x = cx + Math.cos(m.a) * rr, y = cy + Math.sin(m.a) * rr * (1 - w.combat * 0.3);
-      ctx.fillStyle = pal[m.c]; ctx.shadowColor = pal[m.c]; ctx.shadowBlur = 8; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * m.s * 2 + m.a);
+      ctx.fillStyle = pal[m.c];  ctx.shadowBlur = 0; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * m.s * 2 + m.a);
       ctx.beginPath(); ctx.arc(x, y, 1.2 + (m.c === 2 ? 0.6 : 0), 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -95,10 +111,10 @@ export class HudFx {
   arc(ctx, cx, cy, r, f, col, lw, ccw = false) {
     if (f <= 0) return;
     const a0 = -Math.PI / 2, a1 = a0 + TAU * clamp(f, 0, 1) * (ccw ? -1 : 1);
-    ctx.strokeStyle = col; ctx.shadowColor = col; ctx.lineWidth = lw; ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = col;  ctx.lineWidth = lw; ctx.globalAlpha = 0.85;
     ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1, ccw); ctx.stroke();
     const hx = cx + Math.cos(a1) * r, hy = cy + Math.sin(a1) * r;   // bright head
-    ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(hx, hy, lw * 0.9 + Math.sin(this.t * 14) * 0.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';  ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(hx, hy, lw * 0.9 + Math.sin(this.t * 14) * 0.5, 0, TAU); ctx.fill();
   }
 
   /** panel edge as a swaying strand with motes riding it, instead of a hard border */
@@ -107,7 +123,7 @@ export class HudFx {
     const N = 40, sway = 3 + this.burst * 8;
     // path around the rect, top edge then right, bottom, left
     const per = [[r.left, r.top, r.right, r.top], [r.right, r.top, r.right, r.bottom], [r.right, r.bottom, r.left, r.bottom], [r.left, r.bottom, r.left, r.top]];
-    ctx.lineWidth = 1; ctx.shadowBlur = 8;
+    ctx.lineWidth = 1; ctx.shadowBlur = 0;
     for (let e = 0; e < 4; e++) {
       const [x0, y0, x1, y1] = per[e], nx = e % 2 ? 1 : 0, ny = e % 2 ? 0 : 1;
       ctx.beginPath();
@@ -117,7 +133,7 @@ export class HudFx {
         i ? ctx.lineTo(x + nx * o, y + ny * o) : ctx.moveTo(x, y);
       }
       const col = pal[e % 2 ? 3 : 0];
-      ctx.strokeStyle = col; ctx.shadowColor = col; ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 2 + e);
+      ctx.strokeStyle = col;  ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 2 + e);
       ctx.stroke();
     }
     // motes riding the perimeter
@@ -127,7 +143,7 @@ export class HudFx {
       m.t = (m.t + m.v * dt0 * (1 + this.w.combat * 1.5)) % 1;
       let d = m.t * P, x, y;
       if (d < r.width) { x = r.left + d; y = r.top; } else if ((d -= r.width) < r.height) { x = r.right; y = r.top + d; } else if ((d -= r.height) < r.width) { x = r.right - d; y = r.bottom; } else { d -= r.width; x = r.left; y = r.bottom - d; }
-      ctx.fillStyle = pal[2]; ctx.shadowColor = pal[0]; ctx.shadowBlur = 10; ctx.globalAlpha = 0.9;
+      ctx.fillStyle = pal[2];  ctx.shadowBlur = 0; ctx.globalAlpha = 0.9;
       ctx.beginPath(); ctx.arc(x + m.o * 0.3, y + m.o * 0.3, 1.5, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -136,26 +152,30 @@ export class HudFx {
   /** the overview thread: a swaying strand down the left with sparks flowing along it, and a tendril out to each row node */
   drawThread(ctx, pal) {
     const r = this.ov.getBoundingClientRect(), x = r.left + 21, y0 = r.top + 46, y1 = r.bottom - 14, t = this.t;
-    ctx.lineWidth = 1.2; ctx.strokeStyle = pal[0]; ctx.shadowColor = pal[0]; ctx.shadowBlur = 10; ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1.2; ctx.strokeStyle = pal[0];  ctx.shadowBlur = 0; ctx.globalAlpha = 0.7;
     ctx.beginPath();
     for (let i = 0; i <= 40; i++) { const f = i / 40, yy = y0 + (y1 - y0) * f, xx = x + Math.sin(f * 7 + t * 1.6) * 2.5; i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
-    ctx.stroke();
+    ctx.lineWidth = 3.5; ctx.globalAlpha = 0.15; ctx.stroke(); ctx.lineWidth = 1.2; ctx.globalAlpha = 0.7; ctx.stroke();
     for (const s of this.sparks) {
       s.t = (s.t + s.v * dt0 * (1 + this.w.combat)) % 1;
       const yy = y0 + (y1 - y0) * s.t, xx = x + Math.sin(s.t * 7 + t * 1.6) * 2.5;
-      ctx.fillStyle = '#fff'; ctx.shadowColor = pal[2]; ctx.shadowBlur = 10; ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#fff';  ctx.shadowBlur = 0; ctx.globalAlpha = 0.9;
       ctx.beginPath(); ctx.arc(xx, yy, 1.6, 0, TAU); ctx.fill();
     }
     // tendrils from the thread to each node, brightest for the selected row
-    if (this.ovList) for (const row of this.ovList.children) {
-      const rr = row.getBoundingClientRect(); if (rr.bottom < r.top || rr.top > r.bottom) continue;
+    if (this.ovList) {
+      this.rowT = (this.rowT || 0) - dt0;
+      if (this.rowT <= 0 || !this.rows) { this.rowT = 0.2; this.rows = [...this.ovList.children].map((row) => ({ row, rr: row.getBoundingClientRect() })); }
+    }
+    if (this.ovList) for (const { row, rr } of this.rows) {
+      if (rr.bottom < r.top || rr.top > r.bottom) continue;
       const ny = rr.top + rr.height / 2, nx = rr.left + 21, on = row.classList.contains('on'), mob = row.classList.contains('mob');
       const col = on ? pal[1] : mob ? pal[0] : pal[3];
-      ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = on ? 12 : 4; ctx.globalAlpha = on ? 0.9 : 0.25; ctx.lineWidth = on ? 1.4 : 0.8;
+      ctx.strokeStyle = col;  ctx.shadowBlur = 0; ctx.globalAlpha = on ? 0.9 : 0.25; ctx.lineWidth = on ? 1.4 : 0.8;
       ctx.beginPath(); ctx.moveTo(x + Math.sin((ny - y0) / (y1 - y0) * 7 + t * 1.6) * 2.5, ny);
       ctx.bezierCurveTo(nx + 8 + Math.sin(t * 3 + ny) * 3, ny - 4, nx + 16, ny + Math.cos(t * 2.5 + ny) * 3, nx + 26 + (on ? 6 : 0), ny);
       ctx.stroke();
-      if (on) { const px = nx + 32 + 6 * Math.sin(t * 5); ctx.fillStyle = '#fff'; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(px, ny, 1.8, 0, TAU); ctx.fill(); }
+      if (on) { const px = nx + 32 + 6 * Math.sin(t * 5); ctx.fillStyle = '#fff'; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(px, ny, 1.8, 0, TAU); ctx.fill(); }
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
