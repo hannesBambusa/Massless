@@ -34,7 +34,8 @@ export class Lance {
     const qpos = new Float32Array(SIPHON * 3); this.qpos = qpos;
     this.siphon = Array.from({ length: SIPHON }, () => ({ t: -1, v: rnd(0.5, 1.1), off: rnd(0, TAU), r: rnd(0.4, 1.6) }));
     const qg = new THREE.BufferGeometry(); qg.setAttribute('position', new THREE.BufferAttribute(qpos, 3)); this.qgeo = qg;
-    this.group.add(noCull(new THREE.Points(qg, new THREE.PointsMaterial({ color: new THREE.Color(COLORS.gold).multiplyScalar(1.5), size: 0.7, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }))));
+    this.qmat = new THREE.PointsMaterial({ color: new THREE.Color(COLORS.gold).multiplyScalar(1.5), size: 0.7, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.group.add(noCull(new THREE.Points(qg, this.qmat)));
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._d = new THREE.Vector3(); this._n = new THREE.Vector3(); this._u = new THREE.Vector3(); this._tmp = new THREE.Vector3();
   }
 
@@ -42,7 +43,9 @@ export class Lance {
   fire(target) { if (!target || !target.hp) return false; if (this.target !== target) this.lock = 0; this.target = target; this.on = true; return true; }
   stop() { this.on = false; }
   get inRange() { return this.target && this.target.position.distanceTo(this.ship.position) - this.target.radius <= LANCE.range; }
-  describe() { if (!this.on || !this.target) return ''; return this.inRange ? (this.lock < 1 ? `Tuning to ${this.target.name} ${Math.round(this.lock * 100)}%` : `Lance locked on ${this.target.name}`) : `${this.target.name} out of lance range`; }
+  /** what this weapon is called against the current target: a siphon on a condensate, a lance on anything else */
+  get label() { return this.target && this.target.kind === 'cloud' ? 'Siphon' : 'Lance'; }
+  describe() { if (!this.on || !this.target) return ''; const n = this.label; return this.inRange ? (this.lock < 1 ? `Tuning ${n.toLowerCase()} to ${this.target.name} ${Math.round(this.lock * 100)}%` : `${n} locked on ${this.target.name}`) : `${this.target.name} out of ${n.toLowerCase()} range`; }
 
   update(dt) {
     this.t += dt;
@@ -60,7 +63,9 @@ export class Lance {
     b.addScaledVector(this._d, -this.target.radius * 0.8);
     this._n.set(0, 1, 0).cross(this._d).normalize(); this._u.crossVectors(this._d, this._n).normalize();
     const harvesting = this.target.kind === 'cloud';
-    const colour = cCyan.clone().lerp(cWhite, L * 0.7).lerp(cGold, harvesting ? L * 0.9 : L * L * 0.5).multiplyScalar(1 + L * 0.8);
+    const tint = harvesting && this.target.tint !== undefined ? new THREE.Color(this.target.tint) : cGold;   // harvest takes the cloud's colour
+    const colour = cCyan.clone().lerp(cWhite, L * 0.7).lerp(tint, harvesting ? L * 0.9 : L * L * 0.5).multiplyScalar(1 + L * 0.8);
+    this.qmat.color.copy(tint).multiplyScalar(1.5); this.impact2.material.color.copy(harvesting ? tint : cGold);
     for (const s of this.strands) {
       const pts = s.curve.points;
       for (let c = 0; c < 4; c++) {

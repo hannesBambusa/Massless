@@ -70,7 +70,7 @@ game.command = (name) => {
     game.lance.toggle(t);
     // out of range: the ship closes in on its own. Wisps get an orbit inside lance range, condensates an approach
     if (game.lance.on && t.position.distanceTo(ship.position) - t.radius > LANCE.range) {
-      if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, LANCE.range * 0.6)); else ship.approach(t, LANCE.harvestGap);
+      if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, LANCE.range * 0.6)); else ship.keepAtRange(t, LANCE.harvestGap);   // siphon: hold 60 m off the cloud
     }
   }
   if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
@@ -203,7 +203,7 @@ function frame(now) {
   ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);
   rocks.update(dt, (rock) => {
-    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius));
+    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint);
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
   });

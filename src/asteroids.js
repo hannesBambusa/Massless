@@ -26,6 +26,7 @@ export class Asteroids {
       const r = rnd(2, 14), geo = rockGeometry(r);
       const m = new THREE.Group();
       const tint = pick(tints);
+      m.tint = tint;   // the cloud's energy colour: the lance, the siphon and the loot take it
       // cloud: points packed toward the centre
       const N = Math.round(60 + r * 12), cp = new Float32Array(N * 3), cc = new Float32Array(N * 3), col = new THREE.Color();
       for (let k = 0; k < N; k++) {
