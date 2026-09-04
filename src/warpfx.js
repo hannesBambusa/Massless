@@ -17,7 +17,7 @@ export class WarpFx {
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     this.mat = new THREE.LineBasicMaterial({ color: new THREE.Color(COLORS.ice).multiplyScalar(1.3), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     this.lines = new THREE.LineSegments(geo, this.mat);
-    this.lines.visible = false;
+    this.lines.visible = false; this.lines.frustumCulled = false;
     parent.add(this.lines);
     // a cone of light ahead and a glow behind
     this.write();

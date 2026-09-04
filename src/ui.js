@@ -9,7 +9,7 @@ const el = {
   speed: $('hud-speed'), pos: $('hud-pos'), scrap: $('hud-scrap'), shield: $('bar-shield'), hull: $('bar-hull'), help: $('help'),
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
-  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
 };
 
 export class UI {
@@ -74,11 +74,16 @@ export class UI {
     el.shield.style.width = (ship.shield / ship.shieldMax * 100) + '%';
     el.hull.style.width = (ship.hull / ship.hullMax * 100) + '%';
     el.cmdStatus.textContent = ship.describe();
+    const lance = this.game.lance;
+    el.weapon.textContent = lance.describe();
+    el.lance.classList.toggle('on', lance.on);
 
     const sel = selection.obj;
     el.cmd.classList.toggle('has-target', !!sel);
     if (sel) { el.cmdTitle.textContent = sel.name; el.cmdDist.textContent = fmtDist(sel.position.distanceTo(p) - sel.radius, WORLD.auUnits); }
     else { el.cmdTitle.textContent = 'No target'; el.cmdDist.textContent = ''; }
+    el.hp.hidden = !(sel && sel.hpMax);
+    if (sel && sel.hpMax) el.hpFill.style.width = (sel.hp / sel.hpMax * 100) + '%';
 
     // overview: refresh a few times a second, rows keyed by object
     this.overviewTimer -= dt;

@@ -25,14 +25,16 @@ Then open http://localhost:8766/
 | `src/main.js` | renderer, bloom, orbit camera, click handling, frame loop |
 | `src/ships/` | ship designs, one module each, registry in `index.js`. Pick in the top bar, choice saved in localStorage |
 | `src/ship.js` | ship model, command autopilot (approach / orbit / keep / goto / direct), shield and hull |
-| `src/shield.js` | fresnel shield bubble shader |
+| `src/shield.js` | fresnel shield bubble shader (not mounted for now; the shield look is still to be designed) |
 | `src/selection.js` | selected target bracket |
 | `src/ui.js` | HUD, command bar, throttle, overview list |
 | `src/marker.js` | destination marker |
 | `src/starfield.js` | parallax star shells and nebulas |
 | `src/sites.js` | named sites across the system: beacons you can warp between, each with a rock cluster |
 | `src/warpfx.js` | warp tunnel streaks |
-| `src/asteroids.js` | rock clusters around each site |
+| `src/asteroids.js` | rock clusters around each site: hp, shiver under fire, removal |
+| `src/weapons/lance.js` | Resonance lance: lock-on beam |
+| `src/loot.js` | motes released by unbinding, homing to the ship as scrap |
 | `src/streams.js` | helical energy streams with lattices and flowing sparks |
 | `src/input.js` | keyboard state |
 | `src/config.js` | palette and tuning |
@@ -45,6 +47,10 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 |---|---|---|---|
 | **Bloom** | strands unfold into petals around the core | strands bundle into a spiral lance with a hot nose | strands wrap into a tilted halo |
 | **Prism** | prow retracts, gold lattices tilt open into a mandala, rings drift, tendrils bristle | prow extends, lattices face forward, rings stack, tendrils sweep back, helix wake stretches | same as moving |
+
+## Weapons
+
+Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F, or the Lance button) is a sustained beam on the selected rock: lock builds over a second while the target stays within 60 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Orbit at 30 to hold the beam.
 
 ## Controls
 

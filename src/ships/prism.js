@@ -65,7 +65,7 @@ export function build() {
     const t = tendril(i, N);
     const pos = new Float32Array(t.samples * 3);
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const line = new THREE.Line(geo, add(i % 4 === 0 ? COLORS.gold : COLORS.sky, 1.3, 0.75));
+    const line = new THREE.Line(geo, add(i % 4 === 0 ? COLORS.gold : COLORS.sky, 1.3, 0.75)); line.frustumCulled = false;
     group.add(line);   // samples are written in ship space (core offset added), so the bend can act on them
     tendrils.push({ ...t, pos, line });
   }
@@ -85,15 +85,15 @@ export function build() {
   }
   // the helix is rebuilt every frame in ship space (twist, stretch, bend), so its buffers are plain Float32Arrays
   const helixPos = [new Float32Array(HS * 3), new Float32Array(HS * 3)];
-  const helixLines = helixPos.map((pos, k) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const l = new THREE.Line(g, add(k ? COLORS.sky : COLORS.gold, 1.2, 0.8)); group.add(l); return l; });
+  const helixLines = helixPos.map((pos, k) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const l = new THREE.Line(g, add(k ? COLORS.sky : COLORS.gold, 1.2, 0.8)); l.frustumCulled = false; group.add(l); return l; });
   const RUNGS = Math.ceil(HS / 5), rungPos = new Float32Array(RUNGS * 6);
   const rungGeo = new THREE.BufferGeometry(); rungGeo.setAttribute('position', new THREE.BufferAttribute(rungPos, 3));
-  group.add(new THREE.LineSegments(rungGeo, add(COLORS.ice, 1, 0.35)));
+  const rungLines = new THREE.LineSegments(rungGeo, add(COLORS.ice, 1, 0.35)); rungLines.frustumCulled = false; group.add(rungLines);
   const helixBent = [helixPts[0].map((p) => p.clone()), helixPts[1].map((p) => p.clone())];   // this frame's world-space helix, for the sparks
   // sparks riding the helix
   const SP = 60, spos = new Float32Array(SP * 3), sparks = Array.from({ length: SP }, () => ({ t: Math.random(), k: Math.random() < 0.5 ? 0 : 1, v: rnd(0.3, 0.7) }));
   const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
-  group.add(new THREE.Points(sgeo, new THREE.PointsMaterial({ color: COLORS.white, size: 0.14, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })));
+  const sparkPts = new THREE.Points(sgeo, new THREE.PointsMaterial({ color: COLORS.white, size: 0.14, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); sparkPts.frustumCulled = false; group.add(sparkPts);
 
   // spine: a bright axis line from the prow to the helix root, rebuilt each frame so it bends and stretches with the vessel.
   // Colour runs white-hot at the core and fades toward the ends; hubs mark where the rings and lattices are threaded on.
@@ -102,9 +102,9 @@ export function build() {
   spineGeo.setAttribute('position', new THREE.BufferAttribute(spinePos, 3));
   spineGeo.setAttribute('color', new THREE.BufferAttribute(spineCol, 3));
   const spine = new THREE.Line(spineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
-  group.add(spine);
+  spine.frustumCulled = false; group.add(spine);
   const spineGlow = new THREE.Line(spineGeo, new THREE.LineBasicMaterial({ color: new THREE.Color(COLORS.gold).multiplyScalar(0.5), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-  spineGlow.position.y = 0.06; group.add(spineGlow);   // a second pass a hair off-axis thickens the line
+  spineGlow.position.y = 0.06; spineGlow.frustumCulled = false; group.add(spineGlow);   // a second pass a hair off-axis thickens the line
   const hubs = [0, 1, 2, 3, 4].map(() => { const h = glowSprite(COLORS.white, 0.7, 0.9); group.add(h); return h; });
   const cGold = new THREE.Color(COLORS.gold), cWhite = new THREE.Color(COLORS.white), cSky = new THREE.Color(COLORS.sky), cTmp = new THREE.Color();
 

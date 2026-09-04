@@ -67,4 +67,17 @@ export const CAMERA = {
   fov: 60,
 };
 
+export const LANCE = {
+  range: 60,           // m from the target's surface
+  lockTime: 1.2,       // seconds to full lock
+  lockDecay: 0.6,      // seconds to lose it once out of range or off
+  dps: 22,             // at full lock
+};
+
+export const ROCK = {
+  hpPerRadius: 9,      // hp = radius * this
+  scrapPerRadius: 4,   // scrap on unbinding
+  motesPerRadius: 5,
+};
+
 export const BLOOM = { strength: 0.9, radius: 0.7, threshold: 0.2 };

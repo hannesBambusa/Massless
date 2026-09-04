@@ -66,7 +66,7 @@ export class Streams {
     const sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(spos, 3)); sg.setAttribute('color', new THREE.BufferAttribute(scol, 3));
     const pts = new THREE.Points(sg, new THREE.PointsMaterial({ size: 2.2, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
-    this.group.add(pts);
+    pts.frustumCulled = false; this.group.add(pts);
     return { strandPts, sparks, spos, sg };
   }
 

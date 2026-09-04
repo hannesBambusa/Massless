@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { COLORS, SHIP, WARP } from './config.js';
 import { WarpFx } from './warpfx.js';
 import { Trail } from './trail.js';
-import { Shield } from './shield.js';
 import { byId } from './ships/index.js';
 import { clamp, damp } from './utils.js';
 
@@ -20,8 +19,6 @@ export class Ship {
     this.group.add(this.body);
 
     this.setDesign(localStorage.getItem('massless-ship') || 'bloom');
-    this.shieldFx = new Shield(5.2 * SHIP.scale);
-    this.group.add(this.shieldFx.mesh);
 
     this.vel = new THREE.Vector3();
     this.cmd = { kind: 'stop' };   // stop | goto {point} | direction {dir} | approach {obj} | orbit {obj, range} | keep {obj, range} | direct {input}
@@ -188,7 +185,6 @@ export class Ship {
     this.bank += (wantBank - this.bank) * damp(5, dt);
     this.shield = clamp(this.shield + SHIP.shieldRegen * dt, 0, this.shieldMax);
     this.shieldHit = Math.max(0, this.shieldHit - dt * 3);
-    this.shieldFx.update(dt, this.shieldHit, this.shield / this.shieldMax);
     for (const e of this.engines) { const s = 0.9 + thrust * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + thrust * 0.4; }
     // corkscrew: roll about the centreline while orbiting, eased in and out
     this.spinRate += ((orbiting ? SHIP.orbitSpin : 0) - this.spinRate) * damp(2, dt);

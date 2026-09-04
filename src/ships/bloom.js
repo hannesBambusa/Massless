@@ -71,7 +71,7 @@ export function build() {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const color = new THREE.Color(strandColors[i % strandColors.length]).multiplyScalar(1.15);
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
-    const line = new THREE.Line(geo, mat);
+    const line = new THREE.Line(geo, mat); line.frustumCulled = false;
     group.add(line);
     strands.push({ line, f, pos, phase: rnd(0, TAU), speed: rnd(0.6, 1.4), curve: new THREE.CatmullRomCurve3(Array.from({ length: CTRL }, () => new THREE.Vector3()), false, 'catmullrom', 0.6) });
   }
@@ -87,7 +87,8 @@ export function build() {
   const mgeo = new THREE.BufferGeometry();
   mgeo.setAttribute('position', new THREE.BufferAttribute(mpos, 3));
   mgeo.setAttribute('color', new THREE.BufferAttribute(mcol, 3));
-  group.add(new THREE.Points(mgeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })));
+  const motePts = new THREE.Points(mgeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  motePts.frustumCulled = false; group.add(motePts);
 
   // lance extras: hot nose tip and a spinning ring at the waist, both faded in with the lance weight
   const nose = glowSprite(COLORS.white, 1.6, 0); nose.position.set(0, 0, -6.4); group.add(nose);
