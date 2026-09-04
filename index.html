@@ -81,6 +81,16 @@
       <div class="cmd-row"><span class="lbl">Range</span><div id="cmd-ranges"></div><span class="lbl thr">Throttle</span><input id="throttle" type="range" min="0" max="100" value="100"><span id="throttle-num">100%</span></div>
       <div class="cmd-lines"><div id="cmd-status" class="muted">Stopped</div><div id="weapon-status"></div></div>
     </div>
+    <div class="cmd-extra harvest-info">
+      <span class="lbl">Yield</span><span class="big"><span id="yield-num">0</span><small>/ <span id="yield-max">0</span></small></span>
+      <span class="lbl">scrap bound in the condensate</span>
+    </div>
+    <div class="cmd-extra combat-info">
+      <span class="lbl">Threat</span><span class="big small" id="threat-name">No hostile locked</span><span id="threat-dist" class="muted"></span>
+      <span class="lbl">Shield</span><span class="big" id="threat-shield">60 / 60</span>
+    </div>
+    <div class="cmd-side-end">
+    </div>
     <div class="ticks bottom"></div>
     <div id="cmd-hp" hidden><div class="track"><div id="cmd-hp-fill" class="fill"></div></div></div>
   </div>

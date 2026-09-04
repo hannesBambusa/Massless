@@ -1,7 +1,7 @@
-// Scattered neon asteroids so flight has something to fly past. Each is a jittered icosahedron with glowing edges.
+// Energy condensates: clumps of bound energy you can harvest. A soft particle cloud with a faint lattice inside.
 import * as THREE from 'three';
 import { COLORS, WORLD, ROCK } from './config.js';
-import { hullMat, faintEdgeMat } from './materials.js';
+import { faintEdgeMat } from './materials.js';
 import { rnd, pick } from './utils.js';
 
 function rockGeometry(r) {
@@ -25,8 +25,19 @@ export class Asteroids {
     for (const centre of centres) for (let n = 0; n < WORLD.asteroids; n++, i++) {
       const r = rnd(2, 14), geo = rockGeometry(r);
       const m = new THREE.Group();
-      m.add(new THREE.Mesh(geo, hullMat(0x06102a)));
-      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 12), faintEdgeMat(pick(tints), rnd(0.35, 0.8))));
+      const tint = pick(tints);
+      // cloud: points packed toward the centre
+      const N = Math.round(60 + r * 12), cp = new Float32Array(N * 3), cc = new Float32Array(N * 3), col = new THREE.Color();
+      for (let k = 0; k < N; k++) {
+        const u = rnd(-1, 1), t = rnd(0, Math.PI * 2), sq = Math.sqrt(1 - u * u), rr = r * Math.pow(Math.random(), 0.6) * 1.15;
+        cp.set([rr * sq * Math.cos(t), rr * sq * Math.sin(t), rr * u], k * 3);
+        col.set(Math.random() < 0.25 ? COLORS.white : tint).multiplyScalar(rnd(0.5, 1.3)); cc.set([col.r, col.g, col.b], k * 3);
+      }
+      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.BufferAttribute(cp, 3)); cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+      m.add(new THREE.Points(cg, new THREE.PointsMaterial({ size: 0.9, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })));
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 12), faintEdgeMat(tint, rnd(0.18, 0.35))));
+      const core = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 12, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(tint).multiplyScalar(0.9), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.add(core);
       m.position.set(rnd(-half, half), rnd(-half * 0.4, half * 0.4), rnd(-half, half));
       if (m.position.length() < 60) m.position.setLength(80);   // keep the site beacon clear
       m.position.add(centre);
@@ -35,8 +46,8 @@ export class Asteroids {
       m.radius = r;
       m.hpMax = m.hp = Math.round(r * ROCK.hpPerRadius); m.shiver = 0; m.dead = false;
       m.hit = (dmg, lock) => { m.hp = Math.max(0, m.hp - dmg); m.shiver = Math.max(m.shiver, lock); };
-      m.name = `Rock ${String.fromCharCode(65 + (i % 26))}-${Math.floor(i / 26) + 1}`;
-      m.kind = 'asteroid';
+      m.name = `Condensate ${String.fromCharCode(65 + (i % 26))}-${Math.floor(i / 26) + 1}`;
+      m.kind = 'cloud';
       this.group.add(m); this.list.push(m);
     }
     scene.add(this.group);

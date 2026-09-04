@@ -27,12 +27,14 @@ Then open http://localhost:8766/
 | `src/ship.js` | ship model, command autopilot (approach / orbit / keep / goto / direct), shield and hull |
 | `src/shield.js` | fresnel shield bubble shader (not mounted for now; the shield look is still to be designed) |
 | `src/selection.js` | selected target bracket |
-| `src/ui.js` | HUD, command bar, throttle, overview list |
+| `src/ui.js` | HUD, command bar, throttle, overview list, HUD states |
+| `src/hudfx.js` | living HUD layer: a canvas drawing petal strands, motes, edge strands and the overview thread every frame |
 | `src/marker.js` | destination marker |
 | `src/starfield.js` | parallax star shells and nebulas |
 | `src/sites.js` | named sites across the system: beacons you can warp between, each with a rock cluster |
 | `src/warpfx.js` | warp tunnel streaks |
-| `src/asteroids.js` | rock clusters around each site: hp, shiver under fire, removal |
+| `src/asteroids.js` | energy condensates (the harvestable clouds) around each site: hp, shiver under fire, removal |
+| `src/mobs.js` | wisps: hostile energy entities that hunt the ship and bleed its shield |
 | `src/weapons/lance.js` | Resonance lance: lock-on beam |
 | `src/loot.js` | motes released by unbinding, homing to the ship as scrap |
 | `src/streams.js` | helical energy streams with lattices and flowing sparks |
@@ -50,7 +52,7 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 
 ## HUD
 
-One HUD with three states it morphs between: **Nav** (teal, movement commands forward), **Harvest** (gold, lance and orbit forward, the gauge reads the rock's remaining yield) and **Combat** (red, lance, keep range and track forward, outer ring pulses). Keys 1 / 2 / 3 or the chips in the top bar. Firing the lance on a rock from Nav slides into Harvest. States are CSS on `body[data-hud]` in `style.css`.
+One HUD with three states it morphs between: **Nav** (teal, movement commands forward), **Harvest** (gold, lance and orbit forward, the gauge reads the rock's remaining yield) and **Combat** (red, lance, keep range and track forward, outer ring pulses). The HUD follows what you are dealing with: select a condensate and it unfolds into Harvest with a yield readout; select a wisp, or get hunted by one, and it snaps into Combat with a threat readout and a scanline. Keys 1 / 2 / 3 or the chips force a state for six seconds. States are CSS on `body[data-hud]` in `style.css`.
 
 ## Weapons
 

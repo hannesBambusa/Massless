@@ -87,9 +87,17 @@ export class Ship {
       if (c.kind === 'approach') { goal = c.obj.position; stopAt = c.obj.radius + SHIP.approachGap; }
       if (c.kind === 'keep') { goal = c.obj.position; stopAt = c.obj.radius + c.range; }
       _r.copy(goal).sub(p); const d = _r.length();
-      if (d <= stopAt + SHIP.arrive) { if (c.kind === 'goto') this.cmd = { kind: 'stop' }; return out; }
-      const speed = Math.min(max, SHIP.maxSpeed * clamp((d - stopAt) / SHIP.slowRadius, 0.12, 1));
-      return out.copy(_r).multiplyScalar(speed / d);
+      if (c.kind !== 'keep') {
+        // goto / approach: arriving ends the command, so the ship coasts to rest instead of hunting the arrival band
+        if (d <= stopAt + SHIP.arrive) { this.cmd = { kind: 'stop' }; return out; }
+        const speed = Math.min(max, SHIP.maxSpeed * clamp((d - stopAt) / SHIP.slowRadius, 0.12, 1));
+        return out.copy(_r).multiplyScalar(speed / d);
+      }
+      // keep at range: hold the distance with a dead band and speed proportional to the error (no floor, so no chatter)
+      const err = d - stopAt;
+      if (Math.abs(err) <= SHIP.arrive) return out;
+      const speed = Math.min(max, SHIP.maxSpeed * clamp((Math.abs(err) - SHIP.arrive) / SHIP.slowRadius, 0, 1));
+      return out.copy(_r).multiplyScalar(Math.sign(err) * speed / d);
     }
     if (c.kind === 'orbit') {
       // chase a point a little ahead on the orbit circle (counter-clockwise from above); speed capped so the nose can keep up
@@ -149,15 +157,16 @@ export class Ship {
     if (this.cmd.kind === 'stop' && this.cmd.obj) this.cmd = { kind: 'stop' };
 
     // EVE inertia: velocity closes on the wanted velocity exponentially
-    this.vel.lerp(_want, damp(1 / SHIP.tau, dt));
-    if (this.vel.lengthSq() < 0.01 && _want.lengthSq() === 0) this.vel.set(0, 0, 0);
+    this.vel.lerp(_want, damp((_want.lengthSq() > 0 ? 1 : 2.6) / SHIP.tau, dt));   // coasting to rest bleeds speed faster than it builds
+    if (this.vel.lengthSq() < 0.25 && _want.lengthSq() === 0) this.vel.set(0, 0, 0);
     this.speed = this.vel.length();
     g.position.addScaledVector(this.vel, dt);
 
     // nose follows the wanted direction (or the velocity when coasting), level with the world
     // orbiting: the nose follows the velocity, which runs along the ring; otherwise it leads with the steering vector
     const aim = (this.cmd.kind === 'orbit' && this.vel.lengthSq() > 4) ? this.vel : (_want.lengthSq() > 1 ? _want : this.vel);
-    if (aim.lengthSq() > 1) {
+    // coasting to rest: once slow, hold the heading instead of chasing a shrinking velocity vector
+    if (aim.lengthSq() > 1 && !(_want.lengthSq() <= 1 && this.speed < 4)) {
       _m.lookAt(g.position, _r.copy(g.position).add(aim), UP);
       _q.setFromRotationMatrix(_m);
       const before = g.quaternion.clone();

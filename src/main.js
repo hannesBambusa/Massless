@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
@@ -13,6 +13,7 @@ import { Streams } from './streams.js';
 import { Sites } from './sites.js';
 import { Lance } from './weapons/lance.js';
 import { Loot } from './loot.js';
+import { Mobs } from './mobs.js';
 import { Marker } from './marker.js';
 import { Selection } from './selection.js';
 import { UI } from './ui.js';
@@ -50,6 +51,7 @@ const game = {
   scene, camera, state: { scrap: 0 }, direct: false, sites,
   ship: new Ship(scene), stars: new Starfield(scene), rocks: new Asteroids(scene, sites.list.map((x) => x.position)), streams: new Streams(scene), marker: new Marker(scene),
 };
+game.mobs = new Mobs(scene, sites.list.map((x) => x.position));
 game.selection = new Selection(scene, camera);
 game.lance = new Lance(scene, game.ship);
 game.loot = new Loot(scene, game.ship, (n) => { game.state.scrap += n; });
@@ -63,7 +65,7 @@ game.command = (name) => {
   if (name === 'approach') ship.approach(t);
   if (name === 'orbit') ship.orbit(t);
   if (name === 'keep') ship.keepAtRange(t);
-  if (name === 'lance') { if (!t.hp) ui.flash('Nothing to unbind there'); else { game.lance.toggle(t); if (game.lance.on && t.kind === 'asteroid' && ui.hud === 'nav') ui.setHud('harvest'); } }
+  if (name === 'lance') { if (!t.hp) ui.flash('Nothing to unbind there'); else game.lance.toggle(t); }
   if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
 };
 /** select obj; if the ship is busy with a target command, re-issue it against the new target */
@@ -88,8 +90,8 @@ const ray = new THREE.Raycaster();
 const dir = new THREE.Vector3();
 function pickRock(ndc) {
   ray.setFromCamera(new THREE.Vector2(...ndc), camera);
-  const hits = ray.intersectObjects(rocks.group.children, true);
-  if (hits.length) return hits[0].object.parent;
+  const hits = ray.intersectObjects([...rocks.group.children, ...game.mobs.group.children], true);
+  if (hits.length) { let o = hits[0].object; while (o && !o.kind) o = o.parent; if (o) return o; }
   // sites: pick by screen distance to the beacon, since they are sprites far away
   let best = null, bd = 0.05;
   for (const st of sites.list) { const v = st.position.clone().project(camera); if (v.z > 1) continue; const d = Math.hypot(v.x - ndc[0], (v.y - ndc[1]) / camera.aspect); if (d < bd) { bd = d; best = st; } }
@@ -196,6 +198,11 @@ function frame(now) {
     game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius));
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
+  });
+  game.mobs.update(dt, ship, (mob) => {
+    game.loot.burst(mob.position, 14, MOB.scrap / 14, 0xff3d7a);
+    if (selection.obj === mob) selection.clear();
+    if (ship.cmd.obj === mob) ship.stop();
   });
   game.lance.update(dt);
   game.loot.update(dt);

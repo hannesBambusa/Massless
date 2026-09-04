@@ -74,10 +74,22 @@ export const LANCE = {
   dps: 22,             // at full lock
 };
 
-export const ROCK = {
+export const ROCK = {             // energy condensates: the harvestable things
   hpPerRadius: 9,      // hp = radius * this
   scrapPerRadius: 4,   // scrap on unbinding
   motesPerRadius: 5,
+};
+
+export const MOB = {              // wisps
+  perSite: 3,
+  hp: 70,
+  speed: 34,
+  aggroRange: 180,     // starts hunting when the ship is this close
+  leashRange: 700,     // gives up beyond this
+  holdRange: 22,       // hunts to this distance, then circles
+  biteRange: 30,       // bleeds the shield within this
+  dps: 4,
+  scrap: 30,
 };
 
 export const BLOOM = { strength: 0.9, radius: 0.7, threshold: 0.2 };

@@ -224,3 +224,62 @@ body[data-hud="harvest"] #cmd { border-radius: 40px 8px 40px 8px; }
 body[data-hud="harvest"] .ov-row:not(.site) .ov-node::before { background: var(--gold); box-shadow: 0 0 8px var(--gold-d); }
 body[data-hud="combat"] .ov-row:not(.site) .ov-node::before { background: var(--accent); box-shadow: 0 0 8px var(--accent-d); }
 body[data-hud="combat"] .bar .fill { animation-duration: 1.2s; }
+
+/* ---------- state-specific blocks and the visible morph ---------- */
+.cmd-side-end { display: none; }
+.cmd-extra { display: flex; flex-direction: column; gap: 3px; width: 0; overflow: hidden; opacity: 0; margin-left: 0; padding-left: 0; border-left: 1px solid transparent; transition: width 0.55s cubic-bezier(.2,.8,.2,1), opacity 0.4s, margin 0.55s, padding 0.55s; white-space: nowrap; }
+.cmd-extra .big { font-family: var(--font-head); font-size: 20px; color: var(--accent); text-shadow: 0 0 12px var(--accent-d); }
+.cmd-extra .big small { font-size: 11px; color: var(--muted); margin-left: 4px; text-shadow: none; }
+.cmd-extra .big.small { font-size: 12px; }
+body[data-hud="harvest"] .harvest-info, body[data-hud="combat"] .combat-info { width: 170px; opacity: 1; margin-left: 6px; padding-left: 16px; border-left-color: var(--accent-s); }
+@keyframes unfold { 0% { transform: translateX(-50%) scaleY(0.35); filter: brightness(2.2); } 60% { transform: translateX(-50%) scaleY(1.04); } 100% { transform: translateX(-50%) scaleY(1); filter: brightness(1); } }
+@keyframes ovfold { 0% { transform: scaleX(0.6); transform-origin: right; filter: brightness(2); } 100% { transform: scaleX(1); filter: brightness(1); } }
+body.morphing #cmd { animation: unfold 0.7s cubic-bezier(.2,.8,.2,1); }
+body.morphing #overview { animation: ovfold 0.6s cubic-bezier(.2,.8,.2,1); }
+/* overview node kinds */
+.ov-row.mob .ov-node::before { width: 8px; height: 8px; border-radius: 50%; background: #ff3d7a; box-shadow: 0 0 8px rgba(255,61,122,0.7); }
+.ov-row.mob .ov-name { color: #ff8fb0; }
+.ov-row.mob.hunting .ov-node::before { animation: pulse 0.5s ease-in-out infinite; box-shadow: 0 0 12px #ff3d7a; }
+.ov-row.mob .ov-bar { background-image: repeating-linear-gradient(90deg, #ff3d7a 0 6px, transparent 6px 8px); }
+.ov-row.cloud .ov-name { color: var(--text); }
+/* combat: scanline sweeps the command panel, vitals pulse */
+body[data-hud="combat"] #cmd::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: scan 1.6s linear infinite; pointer-events: none; }
+@keyframes scan { to { transform: translateY(150px); } }
+body[data-hud="combat"] .bar.shield .fill { background-image: linear-gradient(90deg, #d4386b, #ff5f8a, #ffd0dd, #ff5f8a, #d4386b); box-shadow: 0 0 14px rgba(255,95,138,0.7); }
+body[data-hud="harvest"] #overview { border-radius: 30px 4px 30px 4px; }
+
+/* ---------- the HUD is alive: continuous motion, faster under threat ---------- */
+@keyframes rot { to { transform: rotate(360deg); } }
+@keyframes rotr { to { transform: rotate(-360deg); } }
+@keyframes thread { 0% { top: 44px; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: calc(100% - 20px); opacity: 0; } }
+@keyframes shimmer { to { background-position: 42px 0; } }
+@keyframes bracket { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes corepulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.6; } }
+@keyframes dash { to { stroke-dashoffset: -26; } }
+body { --hud-rate: 1; }
+body[data-hud="combat"] { --hud-rate: 0.45; }
+body[data-hud="harvest"] { --hud-rate: 1.4; }
+.g-seg { transform-box: fill-box; transform-origin: center; }
+.g-seg.outer { animation: rot calc(26s * var(--hud-rate)) linear infinite; }
+.g-seg.mid { animation: rotr calc(14s * var(--hud-rate)) linear infinite; }
+.g-seg.core { animation: rot calc(40s * var(--hud-rate)) linear infinite, corepulse calc(3s * var(--hud-rate)) ease-in-out infinite; }
+.g-ticks { transform-box: fill-box; transform-origin: center; animation: rotr calc(90s * var(--hud-rate)) linear infinite; }
+.corner { animation: bracket calc(3.2s * var(--hud-rate)) ease-in-out infinite; }
+.corner.tr { animation-delay: 0.4s; } .corner.br { animation-delay: 0.8s; } .corner.bl { animation-delay: 1.2s; }
+.ticks { animation: shimmer calc(2.4s * var(--hud-rate)) linear infinite; }
+#overview::after { content: ''; position: absolute; left: 18px; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff, 0 0 14px var(--accent); animation: thread calc(3.6s * var(--hud-rate)) linear infinite; pointer-events: none; }
+.ov-row .ov-bar { background-size: 8px 2px; animation: shimmer calc(1.6s * var(--hud-rate)) linear infinite; }
+.g-track { stroke-dasharray: 20 6; animation: dash calc(4s * var(--hud-rate)) linear infinite; }
+.g-track.inner { stroke-dasharray: 12 5; animation: dash calc(6s * var(--hud-rate)) linear infinite reverse; }
+.brand-core { animation-duration: calc(2.4s * var(--hud-rate)); }
+.bar .fill { animation-duration: calc(3s * var(--hud-rate)); }
+#topbar::after { animation-duration: calc(6s * var(--hud-rate)); }
+.stat span:last-child { transition: text-shadow 0.3s; }
+
+/* ---------- living layer: the canvas draws strands and motes over the panels; the static rings and borders step back ---------- */
+#hudfx { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+#cmd, #overview { border-color: transparent; box-shadow: none; }
+.g-seg, .g-track, .g-hp, .g-lock, .g-speed, .g-ticks { opacity: 0.35; }
+.corner { opacity: 0.5; }
+#overview::before, #overview::after { display: none; }
+.ov-row .ov-node::before { opacity: 0.9; }

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { fmt, fmtDist } from './utils.js';
 import { SHIP, WORLD } from './config.js';
 import { DESIGNS } from './ships/index.js';
+import { HudFx, setHudDt } from './hudfx.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -11,6 +12,7 @@ const el = {
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
   design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
+  yield: $('yield-num'), yieldMax: $('yield-max'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
 
 export class UI {
@@ -31,14 +33,15 @@ export class UI {
     el.design.value = game.ship.design;
     el.design.addEventListener('change', () => { game.ship.setDesign(el.design.value); el.design.blur(); });
     el.mode.addEventListener('click', () => game.toggleMode());
-    for (const b of document.querySelectorAll('#hud-modes button')) b.addEventListener('click', () => this.setHud(b.dataset.hud));
+    for (const b of document.querySelectorAll('#hud-modes button')) b.addEventListener('click', () => this.lockHud(b.dataset.hud));
     this.setHud('nav', true);
     window.addEventListener('keydown', (e) => {
       if (e.target !== document.body) return;
-      if (e.code === 'Digit1') this.setHud('nav'); if (e.code === 'Digit2') this.setHud('harvest'); if (e.code === 'Digit3') this.setHud('combat');
+      if (e.code === 'Digit1') this.lockHud('nav'); if (e.code === 'Digit2') this.lockHud('harvest'); if (e.code === 'Digit3') this.lockHud('combat');
     });
     el.track.addEventListener('click', () => game.toggleTrack());
     this.proj = new THREE.Vector3();
+    this.fx = new HudFx();
     // gauge ticks: 24 short radial lines around the outer ring
     for (let i = 0; i < 24; i++) {
       const a = i / 24 * Math.PI * 2, l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -47,11 +50,14 @@ export class UI {
       el.gTicks.appendChild(l);
     }
   }
+  /** a manual pick holds the state for a while before the HUD goes back to following the target */
+  lockHud(mode) { this.setHud(mode); clearTimeout(this.hudLockT); this.hudLock = true; this.hudLockT = setTimeout(() => { this.hudLock = false; }, 6000); }
   /** morph the HUD into one of its states: nav | harvest | combat */
   setHud(mode, silent = false) {
     if (this.hud === mode) return;
     this.hud = mode;
     document.body.dataset.hud = mode;
+    if (this.fx) this.fx.setState(mode);
     for (const b of document.querySelectorAll('#hud-modes button')) b.classList.toggle('on', b.dataset.hud === mode);
     if (!silent) { document.body.classList.remove('morphing'); void document.body.offsetWidth; document.body.classList.add('morphing'); }
   }
@@ -89,6 +95,7 @@ export class UI {
 
   update(dt) {
     const { ship, selection, rocks } = this.game;
+    setHudDt(dt);
     el.speed.textContent = Math.round(ship.speed);
     const p = ship.position;
     el.pos.textContent = `${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)}`;
@@ -111,6 +118,13 @@ export class UI {
     el.gHp.style.strokeDashoffset = 314.2 * (1 - hpF);
     el.gLock.style.strokeDashoffset = 238.8 * (1 - (lance.on && lance.target === sel ? lance.lock : 0));
     el.gSpeed.style.strokeDashoffset = 364.4 * (1 - Math.min(1, ship.speed / SHIP.maxSpeed));
+    this.fx.update(dt, { hp: hpF, lock: lance.on && lance.target === sel ? lance.lock : 0, speed: Math.min(1, ship.speed / SHIP.maxSpeed), selected: !!sel });
+    // the HUD follows what you are dealing with: a condensate = harvest, a wisp or a wisp hunting you = combat, else nav
+    const threat = this.game.mobs.list.find((m) => m.hunting && m.position.distanceTo(p) < 120);
+    const want = (sel && sel.kind === 'mob') || threat ? 'combat' : sel && sel.kind === 'cloud' ? 'harvest' : 'nav';
+    if (want !== this.hud && !this.hudLock) this.setHud(want);
+    if (this.hud === 'harvest' && sel && sel.hpMax) { el.yield.textContent = Math.round(sel.radius * 4 * (sel.hp / sel.hpMax)); el.yieldMax.textContent = Math.round(sel.radius * 4); }
+    if (this.hud === 'combat') { const foe = sel && sel.kind === 'mob' ? sel : threat; el.threat.textContent = foe ? `${foe.name} · ${Math.round(foe.hp)} / ${foe.hpMax}` : 'No hostile locked'; el.threatDist.textContent = foe ? fmtDist(foe.position.distanceTo(p), WORLD.auUnits) : ''; el.shieldNum.textContent = Math.round(ship.shield) + ' / ' + ship.shieldMax; }
 
     // overview: refresh a few times a second, rows keyed by object
     this.overviewTimer -= dt;
@@ -118,11 +132,12 @@ export class UI {
     this.overviewTimer = 0.25;
     const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 10);
     const far = this.game.sites.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).sort((a, b) => a[1] - b[1]);
+    const hostile = this.game.mobs.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange * 1.5).sort((a, b) => a[1] - b[1]);
     const keep = new Set();
-    for (const [o, d] of [...far, ...near]) {
+    for (const [o, d] of [...far, ...hostile, ...near]) {
       let row = this.rows.get(o);
       if (!row) {
-        row = document.createElement('div'); row.className = 'ov-row' + (o.kind === 'site' ? ' site' : '');
+        row = document.createElement('div'); row.className = 'ov-row ' + o.kind;
         row.innerHTML = `<span class="ov-node"></span><span class="ov-name"></span><span class="ov-dist"></span><span class="ov-bar"></span>`;
         row.addEventListener('click', () => selection.set(o));
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
@@ -131,7 +146,7 @@ export class UI {
       }
       row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
-      row.classList.toggle('on', o === sel);
+      row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
       el.overview.appendChild(row); keep.add(o);
     }
     for (const [o, row] of this.rows) if (!keep.has(o)) { row.remove(); this.rows.delete(o); }
