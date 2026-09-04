@@ -95,6 +95,19 @@ export function build() {
   const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
   group.add(new THREE.Points(sgeo, new THREE.PointsMaterial({ color: COLORS.white, size: 0.14, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })));
 
+  // spine: a bright axis line from the prow to the helix root, rebuilt each frame so it bends and stretches with the vessel.
+  // Colour runs white-hot at the core and fades toward the ends; hubs mark where the rings and lattices are threaded on.
+  const SN = 40, spinePos = new Float32Array(SN * 3), spineCol = new Float32Array(SN * 3);
+  const spineGeo = new THREE.BufferGeometry();
+  spineGeo.setAttribute('position', new THREE.BufferAttribute(spinePos, 3));
+  spineGeo.setAttribute('color', new THREE.BufferAttribute(spineCol, 3));
+  const spine = new THREE.Line(spineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+  group.add(spine);
+  const spineGlow = new THREE.Line(spineGeo, new THREE.LineBasicMaterial({ color: new THREE.Color(COLORS.gold).multiplyScalar(0.5), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+  spineGlow.position.y = 0.06; group.add(spineGlow);   // a second pass a hair off-axis thickens the line
+  const hubs = [0, 1, 2, 3, 4].map(() => { const h = glowSprite(COLORS.white, 0.7, 0.9); group.add(h); return h; });
+  const cGold = new THREE.Color(COLORS.gold), cWhite = new THREE.Color(COLORS.white), cSky = new THREE.Color(COLORS.sky), cTmp = new THREE.Color();
+
   // engines: glow at the helix root, scaled by the ship code
   const engines = [glowSprite(COLORS.sky, 1.6, 0.7)]; engines[0].position.z = 5.4; group.add(engines[0]);
   const bend = new Bender();
@@ -104,7 +117,7 @@ export function build() {
   const mix = (a, b) => a + (b - a) * w;
   function update(dt, state) {
     t += dt;
-    const b = state.bend || { R: 0, side: 1, w: 0, spin: 0 }; bend.set(b.R, b.side, b.w, b.spin || 0);
+    const b = state.bend; if (b) bend.set(b.trail, b.scale, b.inv, b.invQ, b.spin || 0);
     const energy = 0.35 + state.speedFrac * 0.65 + state.thrust * 0.3;
     w += (clamp(state.speedFrac * 2.2 + state.thrust * 0.5, 0, 1) - w) * damp(2.2, dt);
 
@@ -113,10 +126,9 @@ export function build() {
     prow.rotation.z += dt * mix(0.6, 0.25);
     bend.place(prowGroup, 0, 0, PROW_Z);
     // lattices: open sideways into a mandala at rest (tilted, spread apart, larger), face forward in flight
-    roseA.rotation.x = mix(Math.sin(t * 0.5) * 0.9, 0); roseB.rotation.x = mix(Math.cos(t * 0.4) * 0.9, 0);
-    roseA.rotation.y = mix(t * 0.3, 0); roseB.rotation.y = mix(-t * 0.35, 0);
+    // lattices are wheels on the centreline in every form: no tilt, no yaw, only the spin below
     bend.place(roseAc, 0, 0, mix(-2.6, -1.8)); bend.place(roseBc, 0, 0, mix(2.2, -0.6));
-    spokeLines.visible = bend.k < 1e-5; bend.place(core, 0, 0, CORE_Z); for (const g of coreGlow) bend.place(g, 0, 0, CORE_Z);
+    spokeLines.visible = false; bend.place(core, 0, 0, CORE_Z); for (const g of coreGlow) bend.place(g, 0, 0, CORE_Z);
     roseA.scale.setScalar(mix(1.5, 1)); roseB.scale.setScalar(mix(1.4, 1));
     roseA.rotation.z += dt * 0.35 * energy; roseB.rotation.z -= dt * 0.55 * energy;
     prowTip.material.opacity = 0.5 + 0.4 * Math.sin(t * 6) * state.speedFrac;
@@ -125,7 +137,7 @@ export function build() {
       const r = rings[i];
       r.scale.setScalar(mix(1.5, 1) + 0.06 * Math.sin(t * 3 + i * 1.2));
       bend.place(r.carrier, 0, 0, mix(3.2 + i * 2.4, 3.2 + i * 0.9));
-      r.rotation.x = mix(Math.sin(t * 0.7 + i) * 0.6, 0); r.rotation.y = mix(Math.cos(t * 0.5 + i * 2) * 0.6, 0);
+      r.rotation.x = 0; r.rotation.y = 0; r.rotation.z += dt * (0.6 + i * 0.35) * (i % 2 ? -1 : 1) * energy;   // wheels on the ship's axis, alternating directions
       r.material.opacity = 0.5 + 0.35 * (0.5 + 0.5 * Math.sin(t * 4 - i * 1.5)) * energy;
     }
     // tendrils: writhe, and sweep back harder as the ship moves
@@ -145,6 +157,18 @@ export function build() {
     // helix: twist and stretch
     tail += ((mix(1.5, 4) + state.speedFrac * 9 + state.thrust * 3) - tail) * damp(3, dt);
     const hz = mix(9.0, 5.4), hr = mix(1.6, 1); bend.place(engines[0], 0, 0, hz);
+    // spine from just behind the prow tip to the helix root
+    const z0 = PROW_Z - 2.2, z1 = hz + 0.5;
+    for (let i = 0; i < SN; i++) {
+      const f = i / (SN - 1), z = z0 + (z1 - z0) * f;
+      tmp.set(0, 0, z); bend.point(tmp); spinePos.set([tmp.x, tmp.y, tmp.z], i * 3);
+      const near = 1 - Math.min(1, Math.abs(z - CORE_Z) / 6);              // 1 at the core, 0 six units away
+      cTmp.copy(z < CORE_Z ? cSky : cGold).lerp(cWhite, near * 0.9).multiplyScalar(0.6 + near * 1.4 + energy * 0.3);
+      spineCol.set([cTmp.r, cTmp.g, cTmp.b], i * 3);
+    }
+    spineGeo.attributes.position.needsUpdate = true; spineGeo.attributes.color.needsUpdate = true;
+    const hubZ = [mix(-2.6, -1.8), mix(2.2, -0.6), mix(3.2, 3.2), mix(3.2 + 2.4, 3.2 + 0.9), mix(3.2 + 4.8, 3.2 + 1.8)];
+    hubs.forEach((h, i) => { bend.place(h, 0, 0, hubZ[i]); h.material.opacity = 0.6 + 0.3 * Math.sin(t * 5 + i); });
     helixTwist -= dt * (1.5 + state.speedFrac * 3);
     for (let k = 0; k < 2; k++) {
       for (let i = 0; i < HS; i++) {

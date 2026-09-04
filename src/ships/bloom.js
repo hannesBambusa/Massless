@@ -108,7 +108,7 @@ export function build() {
   /** state: { thrust 0..1, speedFrac 0..1, orbiting bool, targetDir (world->local vector or null) } */
   function update(dt, state) {
     t += dt;
-    const b = state.bend || { R: 0, side: 1, w: 0, spin: 0 }; bend.set(b.R, b.side, b.w, b.spin || 0);
+    const b = state.bend; if (b) bend.set(b.trail, b.scale, b.inv, b.invQ, b.spin || 0);
     // speed always drives the lance; orbiting adds a partial halo on top instead of replacing it
     let wantLance = clamp(state.speedFrac * 1.6, 0, 1);
     if (state.orbiting) wantLance = Math.max(wantLance, 0.85);   // tight orbits are slow, but the vessel still stretches along the ring

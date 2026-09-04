@@ -1,36 +1,44 @@
-// Bend a design along an arc so its whole length lies on the orbit circle.
-// Local space: forward -Z, right +X. The arc's centre sits at x = side / k, where k = curvature (1 / radius in local units).
-// A point at (x, y, z) keeps its height y, its distance from the centre (r = 1/k - side*x), and moves to angle z*k around the centre.
+// Lay a design along the path its nose has travelled, like a snake. Local space: forward -Z, right +X.
+// A model point (x, y, z) becomes: the trail point at arc length z*scale.z behind the nose, offset sideways by x and up by y
+// in that point's own frame (tangent, right, up). The result is converted back into the model's local space, so the design
+// code writes bent coordinates as if nothing happened. `spin` rolls the body about its own centreline before the lay-out.
 import * as THREE from 'three';
 
+const UP = new THREE.Vector3(0, 1, 0);
+const _p = new THREE.Vector3(), _t = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qz = new THREE.Quaternion(), _z = new THREE.Vector3(0, 0, 1);
+
 export class Bender {
-  constructor() { this.k = 0; this.side = 1; this.spin = 0; this.cs = 1; this.sn = 0; }
-  /** curvature k blends with weight w: w = 0 is straight, w = 1 is the full circle of radius R (local units). spin: roll about the centreline, applied before the bend */
-  set(R, side, w, spin = 0) { this.k = R > 0 ? w / R : 0; this.side = side >= 0 ? 1 : -1; this.spin = spin; this.cs = Math.cos(spin); this.sn = Math.sin(spin); }
-  get active() { return this.k > 1e-5 || this.spin !== 0; }
+  constructor() { this.trail = null; this.scale = new THREE.Vector3(1, 1, 1); this.inv = new THREE.Matrix4(); this.invQ = new THREE.Quaternion(); this.spin = 0; this.cs = 1; this.sn = 0; }
+  /** trail: Trail in world space; scale: model group's world scale; inv: world -> model-group-parent matrix; invQ: its rotation; spin: roll */
+  set(trail, scale, inv, invQ, spin = 0) {
+    this.trail = trail; this.scale.copy(scale); this.inv.copy(inv); this.invQ.copy(invQ);
+    this.spin = spin; this.cs = Math.cos(spin); this.sn = Math.sin(spin);
+  }
+  get active() { return !!this.trail; }
+  /** world frame at model depth z: position and tangent, right, up */
+  frame(z) {
+    this.trail.sample(z * this.scale.z, _p, _t);
+    _r.crossVectors(_t, UP); if (_r.lengthSq() < 1e-6) _r.set(1, 0, 0); _r.normalize();
+    _u.crossVectors(_r, _t).normalize();
+  }
   /** bend a point in place */
   point(p) {
     if (!this.active) return p;
-    const x = p.x * this.cs - p.y * this.sn, y = p.x * this.sn + p.y * this.cs;   // roll about the straight axis first
-    p.x = x; p.y = y;
-    if (this.k < 1e-5) return p;
-    const k = this.k, s = this.side, th = p.z * k, r = 1 / k - s * x;
-    p.x = s / k - s * r * Math.cos(th);
-    p.z = r * Math.sin(th);
+    const x = (p.x * this.cs - p.y * this.sn) * this.scale.x, y = (p.x * this.sn + p.y * this.cs) * this.scale.y;
+    this.frame(p.z);
+    p.copy(_p).addScaledVector(_r, x).addScaledVector(_u, y).applyMatrix4(this.inv);
+    p.x /= this.scale.x; p.y /= this.scale.y; p.z /= this.scale.z;
     return p;
   }
-  /** bend raw xyz, returns [x, y, z] */
-  xyz(x, y, z) {
-    if (!this.active) return [x, y, z];
-    const rx = x * this.cs - y * this.sn, ry = x * this.sn + y * this.cs;
-    if (this.k < 1e-5) return [rx, ry, z];
-    const k = this.k, s = this.side, th = z * k, r = 1 / k - s * rx;
-    return [s / k - s * r * Math.cos(th), ry, r * Math.sin(th)];
-  }
-  /** place a rigid part whose straight-line position is (x, y, z): moves it onto the arc and turns it to follow the tangent */
+  xyz(x, y, z) { const v = new THREE.Vector3(x, y, z); this.point(v); return [v.x, v.y, v.z]; }
+  /** place a rigid part whose straight-line position is (x, y, z): moves it onto the path and turns it to follow the tangent */
   place(obj, x, y, z) {
-    const [bx, by, bz] = this.xyz(x, y, z);
-    obj.position.set(bx, by, bz);
-    obj.rotation.set(0, this.k > 1e-5 ? this.side * z * this.k : 0, this.spin, 'YXZ');   // follow the tangent, then roll with the spin
+    if (!this.active) { obj.position.set(x, y, z); obj.rotation.set(0, 0, 0); return; }
+    const v = obj.position.set(x, y, z); this.point(v);
+    this.frame(z);
+    _m.lookAt(new THREE.Vector3(), _t, _u);           // -Z along the tangent, +Y along the frame's up (world space)
+    _q.setFromRotationMatrix(_m).premultiply(this.invQ);
+    _qz.setFromAxisAngle(_z, this.spin);
+    obj.quaternion.copy(_q).multiply(_qz);
   }
 }

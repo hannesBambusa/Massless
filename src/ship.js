@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { COLORS, SHIP, WARP } from './config.js';
 import { WarpFx } from './warpfx.js';
+import { Trail } from './trail.js';
 import { Shield } from './shield.js';
 import { byId } from './ships/index.js';
 import { clamp, damp } from './utils.js';
@@ -28,6 +29,8 @@ export class Ship {
     this.range = SHIP.defaultRange;
     this.thrustLevel = 0; this.bank = 0; this.yawRate = 0; this.bendW = 0; this.spin = 0; this.spinRate = 0;
     this.warpW = 0; this.warpV = 0;   // visual warp weight and current warp speed
+    this.trail = new Trail();
+    this._inv = new THREE.Matrix4(); this._invQ = new THREE.Quaternion();
     this.warpFx = new WarpFx(this.group);
     this.hull = SHIP.hull; this.hullMax = SHIP.hull;
     this.shield = SHIP.shield; this.shieldMax = SHIP.shield; this.shieldHit = 0;
@@ -44,6 +47,7 @@ export class Ship {
     this.body.add(this.model.group);
     this.engines = this.model.engines;
     this.design = d.id;
+    if (this.trail) this.trail.reset(this.group.position, this.forward(new THREE.Vector3()));
     try { localStorage.setItem('massless-ship', d.id); } catch (e) { /* private mode */ }
   }
 
@@ -176,47 +180,31 @@ export class Ship {
     const g = this.group;
     // roll into turns (left wing dips when turning left), plus a lean toward the target while orbiting
     let wantBank = clamp(this.yawRate / SHIP.turn, -1, 1) * SHIP.bank;
-    if (this.cmd.kind === 'orbit') {
+    const orbiting = this.cmd.kind === 'orbit';
+    if (orbiting) {
       const side = Math.sign(this.forward(_fwd).cross(_r.copy(this.cmd.obj.position).sub(g.position)).y || 1);   // +1: target on the left
       wantBank += side * SHIP.orbitBank;
     }
     this.bank += (wantBank - this.bank) * damp(5, dt);
-    // while bent onto the orbit ring: no roll (it would tilt the bent body out of the ring plane) and yaw the body
-    // from the autopilot's chord heading onto the true tangent, so nose, core and tail all lie on the circle
-    let tangentYaw = 0;
-    if (this.cmd.kind === 'orbit' && this.bendW > 0.01) {
-      _r.copy(g.position).sub(this.cmd.obj.position); _r.y = 0;
-      _tan.crossVectors(_r, UP).normalize();                     // travel direction on the ring, same sense as wanted() (r rotated by +ahead about Y)
-      this.forward(_fwd); _fwd.y = 0; _fwd.normalize();
-      tangentYaw = Math.atan2(_fwd.x * _tan.z - _fwd.z * _tan.x, _fwd.x * _tan.x + _fwd.z * _tan.z);   // signed angle fwd -> tangent about Y
-    }
-    this.bodyYaw = (this.bodyYaw || 0) + ((-tangentYaw * Math.min(1, this.bendW * 1.5)) - (this.bodyYaw || 0)) * damp(6, dt);
-    this.body.rotation.y = this.bodyYaw;
-    this.body.rotation.z = this.bank * (1 - this.bendW);
     this.shield = clamp(this.shield + SHIP.shieldRegen * dt, 0, this.shieldMax);
     this.shieldHit = Math.max(0, this.shieldHit - dt * 3);
     this.shieldFx.update(dt, this.shieldHit, this.shield / this.shieldMax);
     for (const e of this.engines) { const s = 0.9 + thrust * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + thrust * 0.4; }
-    // orbit bend: fade in as the ship settles on the ring; radius in the model's local units, centre on the target's side
-    const orbiting = this.cmd.kind === 'orbit';
-    let bendR = 0, bendSide = 1;
-    if (orbiting) {
-      const R = this.cmd.obj.radius + this.cmd.range, d = g.position.distanceTo(this.cmd.obj.position);
-      const onRing = clamp(1 - Math.abs(d - R) / (R * 0.5), 0, 1);
-      this.bendW += (onRing - this.bendW) * damp(2, dt);
-      bendR = R / SHIP.scale;
-      _local.copy(this.cmd.obj.position); g.worldToLocal(_local); bendSide = _local.x >= 0 ? 1 : -1;
-    } else this.bendW += (0 - this.bendW) * damp(3, dt);
     // corkscrew: roll about the centreline while orbiting, eased in and out
-    this.spinRate += ((orbiting ? SHIP.orbitSpin * this.bendW : 0) - this.spinRate) * damp(2, dt);
+    this.spinRate += ((orbiting ? SHIP.orbitSpin : 0) - this.spinRate) * damp(2, dt);
     this.spin = (this.spin + this.spinRate * dt) % (Math.PI * 2);
-    if (!orbiting && this.spinRate < 0.05) this.spin += (0 - this.spin) * damp(1.5, dt);   // settle upright once the spin dies
-    this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { R: bendR, side: bendSide, w: this.bendW, spin: this.spin } });
-    // warp: stretch the vessel along its axis and run the tunnel
-    const ws = this.warpW;
+    if (!orbiting && this.spinRate < 0.05) { this.spin += (0 - this.spin) * damp(1.5, dt); if (Math.abs(this.spin) < 0.002) this.spin = 0; }
+    // snake: the body is laid along the path the nose has travelled. Roll (bank + corkscrew) happens about that centreline,
+    // so the body carries no rotation of its own.
+    const ws = this.warpW;   // warp: stretch the vessel along its axis (the trail lay-out reads this scale)
     this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 + ws * WARP.stretch));
-    this.warpFx.update(dt, ws, this.warpV);
-    this.model.group.rotation.z = 0;
+    this.trail.push(g.position, this.forward(_fwd));
+    this.body.rotation.set(0, 0, 0);
+    g.updateMatrixWorld(true);
+    this._inv.copy(this.body.matrixWorld).invert();                   // world -> body local (model group sits at the body origin, only scaled)
+    this._invQ.setFromRotationMatrix(this._inv).normalize();
+    this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
+    this.warpFx.update(dt, this.warpW, this.warpV);
 
   }
 
