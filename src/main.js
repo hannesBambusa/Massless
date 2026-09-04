@@ -1,4 +1,4 @@
-// Driftline: EVE-style command flight with an optional direct-flight mode. Renderer, cameras, bloom, input routing and the frame loop.
+// Massless: EVE-style command flight with an optional direct-flight mode. Renderer, cameras, bloom, input routing and the frame loop.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -174,4 +174,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.driftline = game;
+window.massless = game;

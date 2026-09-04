@@ -1,8 +1,10 @@
-# Driftline
+# Massless
 
-A universe of pure energy. Your vessel is bound energy that changes form with what it does: a lance when flying, a bloom when idle, a halo when orbiting. Seed of a tower-defence MMO (EVE meets WoW, played as tower defence). Same look as Coreline (`../tower-defence`), now in 3D.
+A universe of pure energy, where nothing has mass and energy takes on forms. Your vessel is bound energy that changes shape with what it does. Seed of a tower-defence MMO: EVE-style command flight, WoW-style progression, combat played as tower defence. Grew out of Coreline (`../tower-defence`), now in 3D.
 
-## Run
+## Play
+
+Hosted on GitHub Pages from this folder, no build. Locally:
 
 ```
 python3 serve.py
@@ -21,7 +23,7 @@ Then open http://localhost:8766/
 | File | Owns |
 |---|---|
 | `src/main.js` | renderer, bloom, orbit camera, click handling, frame loop |
-| `src/ships/` | ship designs, one module each (`bloom`, `prism`), registry in `index.js`. Pick in the top bar, choice saved in localStorage |
+| `src/ships/` | ship designs, one module each, registry in `index.js`. Pick in the top bar, choice saved in localStorage |
 | `src/ship.js` | ship model, command autopilot (approach / orbit / keep / goto / direct), shield and hull |
 | `src/shield.js` | fresnel shield bubble shader |
 | `src/selection.js` | selected target bracket |
@@ -32,6 +34,15 @@ Then open http://localhost:8766/
 | `src/streams.js` | helical energy streams with lattices and flowing sparks |
 | `src/input.js` | keyboard state |
 | `src/config.js` | palette and tuning |
+
+## Ships
+
+Every design exports `id`, `name`, `description` and `build()`, which returns `{ group, engines, update(dt, state) }`. `state` carries `thrust`, `speedFrac` and `orbiting`, so a design can morph with what the ship is doing. Add a design by dropping a module in `src/ships/` and importing it in `index.js`.
+
+| Design | At rest | Moving | Orbiting |
+|---|---|---|---|
+| **Bloom** | strands unfold into petals around the core | strands bundle into a spiral lance with a hot nose | strands wrap into a tilted halo |
+| **Prism** | prow retracts, gold lattices tilt open into a mandala, rings drift, tendrils bristle | prow extends, lattices face forward, rings stack, tendrils sweep back, helix wake stretches | same as moving |
 
 ## Controls
 

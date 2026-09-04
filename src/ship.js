@@ -16,7 +16,7 @@ export class Ship {
     this.body = new THREE.Group();           // visual bank only
     this.group.add(this.body);
 
-    this.setDesign(localStorage.getItem('driftline-ship') || 'bloom');
+    this.setDesign(localStorage.getItem('massless-ship') || 'bloom');
     this.shieldFx = new Shield(5.2 * SHIP.scale);
     this.group.add(this.shieldFx.mesh);
 
@@ -40,7 +40,7 @@ export class Ship {
     this.body.add(this.model.group);
     this.engines = this.model.engines;
     this.design = d.id;
-    try { localStorage.setItem('driftline-ship', d.id); } catch (e) { /* private mode */ }
+    try { localStorage.setItem('massless-ship', d.id); } catch (e) { /* private mode */ }
   }
 
   get position() { return this.group.position; }
