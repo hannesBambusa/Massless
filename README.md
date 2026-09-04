@@ -57,7 +57,7 @@ One HUD with three states it morphs between: **Nav** (teal, movement commands fo
 
 ## Systems
 
-Three star systems (`src/systems.js`), each with its own sites, star colour and sky. Only the current one is loaded; the overview lists the others with distances in light-years. Click one and press J (or the Fold offer): the ship aligns, charges, and folds. The tunnel turns violet-white and stretches, the camera pushes in and shakes, the screen bleaches at the peak, and the world is swapped underneath. You drop in beside the new system's home site.
+Three star systems (`src/systems.js`), each with its own sites, star colour and sky. Only the current one is loaded; the overview lists the others with distances in light-years. Each system row has a fold button, each site row a warp button. Press it (or pick a system and press J): the ship comes to rest and spools the fold (rings gather onto it while space starts to bend), then folds. The tunnel turns violet-white and stretches, the camera pushes in and shakes, the screen bleaches at the peak, and the world is swapped underneath. Every system has a gate, a small dark hole listed as a site; a fold drops you in at a random spot 1 to 5 km around the gate of the system you arrive in (`src/gate.js`).
 
 ## Energy
 
@@ -71,7 +71,7 @@ Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F
 
 Two flight modes, V or the top-right button switches.
 
-**Command mode (default, EVE style).** Click an object or an overview row to select it (right-click selects and carries the running orbit / approach / keep-range over to the new target), then Approach (Q), Orbit (W) or Keep at range (E) at the chosen range. Double-click empty space to fly that way. Distances beyond 1 km show in AU (`WORLD.auUnits` world units per AU). Warp (S) to a selected site or anything over 150 m away: the camera swings in behind the ship to look down the warp line, the ship aligns to 75% speed, stretches into warp, streaks across the system and drops out beside the target. Space stops (not mid-warp). Track (C) swings the camera so the target stays in view, any drag releases it. The target's name and distance follow it on screen, pinned to the edge with an arrow when it is out of view. Throttle slider caps speed. Drag orbits the camera, wheel zooms.
+**Command mode (default, EVE style).** Click an object or an overview row to select it (right-click selects and carries the running orbit / approach / keep-range over to the new target), then Approach (Q), Orbit (W) or Keep at range (E) at the chosen range. Double-click empty space to fly that way. Distances read in m below 1 km, km below 10 km, and AU beyond (`WORLD.auUnits` world units per AU). Warp (S) to a selected site or anything over 150 m away: the camera swings in behind the ship to look down the warp line, the ship aligns to 75% speed, stretches into warp, streaks across the system and drops out beside the target. Space stops (not mid-warp). Track (C) swings the camera so the target stays in view, any drag releases it. The target's name and distance follow it on screen, pinned to the edge with an arrow when it is out of view. Throttle slider caps speed. Drag orbits the camera, wheel zooms.
 
 **Direct mode.** Chase camera. W/S thrust, A/D strafe, R/F up and down. The ship stays level. Space stops.
 

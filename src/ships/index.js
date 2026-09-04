@@ -3,6 +3,11 @@
 import * as bloom from './bloom.js';
 import * as prism from './prism.js';
 import * as shoal from './shoal.js';
+import * as kite from './kite.js';
+import * as gyre from './gyre.js';
+import * as ember from './ember.js';
+import * as loom from './loom.js';
+import * as medusa from './medusa.js';
 
-export const DESIGNS = [bloom, prism, shoal];
+export const DESIGNS = [bloom, prism, shoal, kite, gyre, ember, loom, medusa];
 export const byId = (id) => DESIGNS.find((d) => d.id === id) || DESIGNS[0];

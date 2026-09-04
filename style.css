@@ -466,3 +466,30 @@ body[data-hud="harvest"] { --hud-rate: 1.4; }
 #warp-readout.jump { color: var(--lav); }
 #warp-readout.jump::before { border-color: var(--lav); box-shadow: 0 0 14px var(--lav-s); }
 #warp-readout.jump #warp-speed, #warp-readout.jump #warp-left { text-shadow: 0 0 8px var(--lav); }
+
+/* ---------- inline actions in overview rows: warp to a site, fold to a system ---------- */
+.ov-row { grid-template-columns: 22px 1fr auto auto; }
+.ov-row .ov-bar { grid-column: 2 / 5; }
+.ov-act { width: 22px; height: 22px; padding: 0; margin-left: 6px; border: none; border-radius: 50%; background: none; color: var(--gold); cursor: pointer; display: grid; place-items: center; position: relative; opacity: 0.55; transition: opacity 0.15s; }
+.ov-act[hidden] { display: none; }
+.ov-act::before { content: ''; position: absolute; inset: 1px; border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--gold) 60%, transparent); }
+.ov-act svg { width: 13px; height: 13px; filter: drop-shadow(0 0 3px var(--gold-d)); }
+.ov-act:hover { opacity: 1; background: none; box-shadow: none; }
+.ov-act:hover::before { border-style: solid; border-color: var(--gold); box-shadow: 0 0 8px var(--gold-d); }
+.ov-act.jump { color: var(--lav); }
+.ov-act.jump::before { border-color: color-mix(in srgb, var(--lav) 60%, transparent); }
+.ov-act.jump svg { filter: drop-shadow(0 0 3px var(--lav-d)); }
+.ov-act.jump:hover::before { border-color: var(--lav); box-shadow: 0 0 8px var(--lav-d); }
+.ov-row:hover .ov-act { opacity: 0.9; }
+
+.ov-row.site[data-type="gate"] .ov-node::before { background: #000; border: 1.5px solid var(--lav); box-shadow: 0 0 10px var(--lav-d); border-radius: 50%; transform: none; width: 10px; height: 10px; }
+.ov-row.site[data-type="gate"] .ov-name { color: var(--lav); }
+.ov-row.site[data-type="gate"] .ov-name::after { content: 'gate'; color: var(--lav); }
+.ov-row.site[data-type="gate"] .ov-bar { background-image: repeating-linear-gradient(90deg, var(--lav) 0 6px, transparent 6px 8px); }
+
+/* ---------- announcement: fold complete and the like ---------- */
+#announce { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(0.96); z-index: 6; pointer-events: none; text-align: center; opacity: 0; transition: opacity 0.6s ease, transform 0.6s ease; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#announce.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#announce .an-title { font-family: var(--font-head); font-size: 22px; letter-spacing: 8px; text-transform: uppercase; color: var(--lav); text-shadow: 0 0 14px var(--lav-d), 0 0 40px var(--lav-s); }
+#announce .an-sub { font-family: var(--font-body); font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--text); text-shadow: 0 0 10px var(--lav-s); }
+#announce .an-line { width: 260px; height: 1px; background: linear-gradient(90deg, transparent, var(--lav), transparent); }

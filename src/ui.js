@@ -15,7 +15,7 @@ const el = {
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
   design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), auto: $('btn-auto'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
-  jump: $('btn-jump'), sysList: $('system-list'),
+  sysList: $('system-list'),
   warp: $('warp-readout'), warpSpeed: $('warp-speed'), warpLeft: $('warp-left'),
   yield: $('yield-num'), yieldMax: $('yield-max'), yieldKind: $('yield-kind'), holdList: $('hold-list'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
@@ -44,9 +44,9 @@ export class UI {
     this.sysRows = new Map();
     for (const sys of SYSTEMS) {
       const row = document.createElement('div'); row.className = 'ov-row system'; row.dataset.id = sys.id;
-      row.innerHTML = `<span class="ov-node"></span><span class="ov-name">${sys.name}</span><span class="ov-dist"></span><span class="ov-bar"></span>`;
-      row.addEventListener('mousedown', (e) => { if (e.button !== 0) return; if (sys.id === game.system.id) return; game.jumpTarget = sys; });
-      row.addEventListener('dblclick', () => { game.jumpTarget = sys; game.command('jump'); });
+      row.innerHTML = `<span class="ov-node"></span><span class="ov-name">${sys.name}</span><span class="ov-dist"></span><button class="ov-act jump" title="Fold to ${sys.name}"><svg><use href="#i-warp"/></svg></button><span class="ov-bar"></span>`;
+      row.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.closest('.ov-act')) return; if (sys.id === game.system.id) return; game.jumpTarget = sys; });
+      row.querySelector('.ov-act').addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button !== 0) return; game.jumpTarget = sys; game.command('jump'); });
       el.sysList.appendChild(row); this.sysRows.set(sys.id, row);
     }
     for (const b of document.querySelectorAll('#hud-modes button')) b.addEventListener('click', () => this.lockHud(b.dataset.hud));
@@ -91,6 +91,12 @@ export class UI {
     if (this.fx) this.fx.setState(mode);
     for (const b of document.querySelectorAll('#hud-modes button')) b.classList.toggle('on', b.dataset.hud === mode);
     if (!silent) { document.body.classList.remove('morphing'); void document.body.offsetWidth; document.body.classList.add('morphing'); }
+  }
+  /** a large centred announcement that fades in, holds, and fades out */
+  announce(title, sub) {
+    const a = el.announce; a.querySelector('.an-title').textContent = title; a.querySelector('.an-sub').textContent = sub || '';
+    a.classList.remove('on'); void a.offsetWidth; a.classList.add('on');
+    clearTimeout(this.announceT); this.announceT = setTimeout(() => a.classList.remove('on'), 4200);
   }
   flash(msg) { el.flash.textContent = msg; el.flash.classList.add('on'); clearTimeout(this.flashT); this.flashT = setTimeout(() => el.flash.classList.remove('on'), 2200); }
   setAuto(on) { el.auto.classList.toggle('on', on); }
@@ -166,16 +172,16 @@ export class UI {
       const sys = SYSTEMS.find((x) => x.id === id), here = this.game.system.id === id;
       row.classList.toggle('here', here); row.classList.toggle('on', this.game.jumpTarget === sys);
       row.children[2].textContent = here ? 'here' : lyBetween(this.game.system, sys).toFixed(1) + ' ly';
+      row.querySelector('.ov-act').hidden = here || ship.warping;
     }
-    el.jump.hidden = !this.game.jumpTarget || ship.warping;
-    if (this.game.jumpTarget) el.jump.querySelector('.al').textContent = `Fold to ${this.game.jumpTarget.name}`;
+
     // warp readout above the command core: speed in AU/s and distance left, steady numbers
     el.warp.hidden = !ship.warping;
     if (ship.warping) {
       el.warpSpeed.textContent = (ship.speed / WORLD.auUnits).toFixed(ship.cmd.kind === 'jump' ? 0 : 2);
-      el.warpLeft.textContent = ship.cmd.kind === 'jump' ? (ship.cmd.phase === 'fold' ? Math.round(100 * Math.min(1, ship.cmd.t / 4)) + '%' : ship.cmd.phase) : ((ship.cmd.obj.position.distanceTo(p)) / WORLD.auUnits).toFixed(1);
+      el.warpLeft.textContent = ship.cmd.kind === 'jump' ? (ship.cmd.phase === 'fold' ? Math.round(100 * Math.min(1, ship.cmd.t / 4)) + '%' : ship.cmd.phase === 'spool' ? Math.round(100 * ship.spoolW) + '%' : 'arrive') : ((ship.cmd.obj.position.distanceTo(p)) / WORLD.auUnits).toFixed(1);
       el.warp.classList.toggle('jump', ship.cmd.kind === 'jump');
-      document.getElementById('warp-left-unit').textContent = ship.cmd.kind === 'jump' ? 'fold' : 'AU left';
+      document.getElementById('warp-left-unit').textContent = ship.cmd.kind === 'jump' ? (ship.cmd.phase === 'spool' ? 'spool' : 'fold') : 'AU left';
     }
     if (this.hud === 'combat') { const foe = sel && sel.kind === 'mob' ? sel : threat; el.threat.textContent = foe ? `${foe.name} · ${Math.round(foe.hp)} / ${foe.hpMax}` : 'No hostile locked'; el.threatDist.textContent = foe ? fmtDist(foe.position.distanceTo(p), WORLD.auUnits) : ''; el.shieldNum.textContent = Math.round(ship.shield) + ' / ' + ship.shieldMax; }
 
@@ -191,7 +197,9 @@ export class UI {
       let row = this.rows.get(o);
       if (!row) {
         row = document.createElement('div'); row.className = 'ov-row ' + o.kind;
-        row.innerHTML = `<span class="ov-node"></span><span class="ov-name"></span><span class="ov-dist"></span><span class="ov-bar"></span>`;
+        row.innerHTML = `<span class="ov-node"></span><span class="ov-name"></span><span class="ov-dist"></span>${o.kind === 'site' ? '<button class="ov-act warp" title="Warp here"><svg><use href="#i-warp"/></svg></button>' : ''}<span class="ov-bar"></span>`;
+        const act = row.querySelector('.ov-act');
+        if (act) act.addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button !== 0) return; selection.set(o); this.game.command('warp'); });
         // select on mouse-down: the list re-sorts while you hold the button, and a moved row would swallow a click
         row.addEventListener('mousedown', (e) => { if (e.button === 0) selection.set(o); });
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
@@ -199,9 +207,10 @@ export class UI {
         this.rows.set(o, row);
       }
       row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
+      if (o.kind === 'site') row.querySelector('.ov-act').hidden = ship.warping || d < 150;
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
       row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
-      if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed' }[o.type] || ''; }
+      if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed', gate: 'Gate: the dark hole folds open onto other systems; arrivals emerge around it' }[o.type] || ''; }
       keep.add(o); order.push(row);
     }
     for (const [o, row] of this.rows) if (!keep.has(o)) { row.remove(); this.rows.delete(o); }

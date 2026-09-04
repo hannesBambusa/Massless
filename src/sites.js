@@ -67,6 +67,7 @@ export class Sites {
 
   update(dt, camPos) {
     for (const s of this.list) {
+      if (!s.rings) continue;   // the gate keeps its own animation
       for (const r of s.rings) { r.rotation.z += r.spin * dt; r.rotation.x += r.spin * 0.3 * dt; }
       // far glint grows with distance so it stays a visible point on the horizon
       const d = s.position.distanceTo(camPos);

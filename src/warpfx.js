@@ -19,8 +19,26 @@ export class WarpFx {
     this.lines = new THREE.LineSegments(geo, this.mat);
     this.lines.visible = false; this.lines.frustumCulled = false;
     parent.add(this.lines);
-    // a cone of light ahead and a glow behind
     this.write();
+    // spool rings: three big rings that turn and contract onto the ship as the fold winds up
+    const ringPts = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU; ringPts.push(new THREE.Vector3(Math.cos(a), Math.sin(a), 0)); }
+    const rg = new THREE.BufferGeometry().setFromPoints(ringPts);
+    this.rings = [0, 1, 2].map((i) => {
+      const r = new THREE.LineLoop(rg, new THREE.LineBasicMaterial({ color: new THREE.Color(0x9f8cff).multiplyScalar(1.5), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+      r.i = i; r.visible = false; r.frustumCulled = false; parent.add(r); return r;
+    });
+    this.spoolT = 0;
+  }
+  /** w: spool weight 0..1 (rings contract), jump: fold weight (rings fade out as the fold takes over) */
+  spool(dt, w, jump) {
+    this.spoolT += dt;
+    for (const r of this.rings) {
+      const on = w > 0.01; r.visible = on; if (!on) continue;
+      const k = (r.i + 1) / 3;
+      r.scale.setScalar(4 + (1 - w) * (30 + r.i * 18) + Math.sin(this.spoolT * 3 + r.i) * 0.6);
+      r.rotation.set(Math.sin(this.spoolT * 0.5 + r.i) * 0.8, this.spoolT * (0.4 + r.i * 0.25) * k, Math.cos(this.spoolT * 0.4 + r.i * 2) * 0.8);
+      r.material.opacity = (0.25 + w * 0.55) * (1 - jump * 0.6);
+    }
   }
   write() {
     for (let i = 0; i < N; i++) {

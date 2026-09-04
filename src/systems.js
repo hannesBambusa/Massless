@@ -4,7 +4,7 @@ import { COLORS } from './config.js';
 
 export const SYSTEMS = [
   {
-    id: 'alpha', name: 'Alpha Reach', ly: [0, 0, 0], star: COLORS.cyan, nebula: 0x1e4fd8,
+    id: 'alpha', name: 'Alpha Reach', ly: [0, 0, 0], star: COLORS.cyan, nebula: 0x1e4fd8, gate: { name: 'Reach Gate', pos: [-6000, 200, 4000] },
     sites: [
       { name: 'Ash Reach', pos: [0, 0, 0], color: COLORS.cyan, type: 'harvest', home: true },
       { name: 'Cinder Belt', pos: [12600, 360, -5400], color: COLORS.amber, type: 'harvest' },
@@ -16,7 +16,7 @@ export const SYSTEMS = [
     ],
   },
   {
-    id: 'kestrel', name: 'Kestrel Verge', ly: [4.2, 0.6, -1.1], star: COLORS.gold, nebula: 0x8a4a12,
+    id: 'kestrel', name: 'Kestrel Verge', ly: [4.2, 0.6, -1.1], star: COLORS.gold, nebula: 0x8a4a12, gate: { name: 'Verge Gate', pos: [5000, -300, 7000] },
     sites: [
       { name: 'Kestrel Roost', pos: [0, 0, 0], color: COLORS.gold, type: 'harvest', home: true },
       { name: 'Tallow Reach', pos: [-9800, 400, 8400], color: COLORS.amber, type: 'harvest' },
@@ -26,7 +26,7 @@ export const SYSTEMS = [
     ],
   },
   {
-    id: 'umbra', name: 'Umbra Tessellate', ly: [-3.1, -2.2, 5.4], star: COLORS.violet, nebula: 0x4a1a8a,
+    id: 'umbra', name: 'Umbra Tessellate', ly: [-3.1, -2.2, 5.4], star: COLORS.violet, nebula: 0x4a1a8a, gate: { name: 'Tessel Gate', pos: [-7000, 400, -6000] },
     sites: [
       { name: 'Tessel Prime', pos: [0, 0, 0], color: COLORS.violet, type: 'harvest', home: true },
       { name: 'Lattice Fall', pos: [11000, -300, 11000], color: COLORS.sky, type: 'harvest' },

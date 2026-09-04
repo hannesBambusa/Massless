@@ -14,6 +14,7 @@ import { Streams } from './streams.js';
 import { Sites } from './sites.js';
 import { Rifts } from './rift.js';
 import { SYSTEMS, systemById, lyBetween } from './systems.js';
+import { Gate } from './gate.js';
 import { Lance } from './weapons/lance.js';
 import { Loot } from './loot.js';
 import { Mobs } from './mobs.js';
@@ -33,7 +34,7 @@ host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.bg);
 scene.fog = new THREE.FogExp2(COLORS.bg, 0.0005);
-const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight, 0.1, 6000);
+const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight, 0.1, 14000);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -58,7 +59,7 @@ const game = {
 };
 /** build a system around the ship: sites, streams, condensates, wisps, rifts. Unloads whatever was there. */
 game.loadSystem = (id) => {
-  for (const k of ['rifts', 'mobs', 'rocks', 'streams', 'sites']) if (game[k]) game[k].dispose();
+  for (const k of ['rifts', 'mobs', 'rocks', 'streams', 'sites', 'gate']) if (game[k]) game[k].dispose();
   const sys = systemById(id);
   game.system = sys;
   game.sites = new Sites(scene, sys.sites);
@@ -67,6 +68,8 @@ game.loadSystem = (id) => {
   game.rocks = new Asteroids(scene, game.sites.list, game.streams);
   game.mobs = new Mobs(scene, game.sites.list);
   game.rifts = new Rifts(scene, combat);
+  game.gate = new Gate(scene, sys.gate);
+  game.sites.list.push(game.gate.group);   // the gate is a site: listed, selectable, warpable
   game.stars.setNebula(sys.nebula, sys.star);
   document.getElementById('hud-sector').textContent = sys.name;
 };
@@ -74,6 +77,7 @@ game.loadSystem('alpha');
 game.selection = new Selection(scene, camera);
 game.lance = new Lance(scene, game.ship);
 game.saver = new ProgressSaver(game.state);
+if (!game.state.hold) game.state.hold = {};   // collected energy by key
 game.loot = new Loot(scene, game.ship, (key, n) => { game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark(); });
 const { ship, selection, marker, stars } = game;
 
@@ -87,10 +91,10 @@ game.command = (name) => {
       // mid-fold: swap the world under the ship; the ship then runs in along its line and stops beside the new home site
       game.loadSystem(sys.id);
       game.jumpTarget = null;
-      ui.flash(`Fold complete. ${sys.name}`);
+      game.snapCamera = true;   // the ship has moved worlds: the camera pivot must follow instantly, not lerp across
       setTimeout(() => ship.trail.reset(ship.position, ship.forward(new THREE.Vector3())), 50);
-      return game.sites.home.position;
-    });
+      return game.gate.arrivalPoint();   // arrivals emerge scattered around the gate
+    }, () => ui.announce('Fold complete', `Current system: ${sys.name}`));
     return;
   }
   if (name === 'auto') return game.toggleAuto();
@@ -207,7 +211,9 @@ function updateDirect() {
 const pivot = new THREE.Vector3(), camTarget = new THREE.Vector3(), tmp = new THREE.Vector3();
 camera.position.set(0, 10, 30);
 function updateCamera(dt) {
-  pivot.lerp(ship.position, damp(CAMERA.lerp + ship.warpW * 80, dt));   // at warp speed the pivot must stay glued to the ship
+  if (game.snapCamera) { pivot.copy(ship.position); game.snapCamera = false; }
+  if (ship.cmd.kind === 'jump') pivot.copy(ship.position);   // through a fold the pivot stays glued to the ship
+  else pivot.lerp(ship.position, damp(CAMERA.lerp + ship.warpW * 80, dt));   // at warp speed the pivot must stay close
   if (game.direct) {
     const c = CAMERA.chase; ship.forward(tmp); tmp.y = 0; tmp.normalize();
     camTarget.copy(ship.position).addScaledVector(tmp, -c.back * zoom); camTarget.y += c.up * zoom;
@@ -291,6 +297,7 @@ function frame(now) {
   game.loot.update(dt);
   game.streams.update(dt);
   game.rifts.update(dt);
+  game.gate.update(dt);
   game.sites.update(dt, camera.position);
   updateWarpLook();
   selection.update(dt);

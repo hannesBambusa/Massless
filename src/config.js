@@ -28,7 +28,7 @@ export const SHIP = {
 };
 
 export const WARP = {
-  speed: 14000,        // units/s in full warp (~5.6 AU/s)
+  speed: 14000,        // units/s in full warp (~0.56 AU/s)
   minDist: 150,        // targets closer than this cannot be warped to
   alignSpeed: 0.75,    // fraction of max speed needed to enter warp (EVE)
   alignAngle: 0.08,    // radians off the target still counted as aligned
@@ -53,7 +53,7 @@ export const WORLD = {
   starRadius: [900, 500, 250],
   streams: 4,          // helical energy streams per harvest site
   overviewRange: 400,  // rocks listed in the overview (sites are always listed)
-  auUnits: 2500,       // world units per AU for the HUD (local distances stay in m)
+  auUnits: 25000,      // world units per AU for the HUD: m below 1 km, km below 10 km, AU beyond
   hudGrid: 20,         // invisible screen grid (px) that resizable HUD panels snap to
   overviewMin: [200, 120], // smallest overview panel [w, h] in px
 };
@@ -75,7 +75,7 @@ export const CAMERA = {
 };
 
 export const JUMP = {             // interstellar jump between systems
-  charge: 2.2,         // s: after align, the vessel winds up and the tunnel forms
+  spool: 3.5,          // s: the ship comes to rest while the fold winds up around it
   fold: 4.0,           // s: through the fold, the system swaps half-way
   arrive: 1.8,         // s: drop-in and slow down at the new home site
   speed: 60000,        // displayed speed during the fold (units/s), for the readout

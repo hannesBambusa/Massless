@@ -26,7 +26,7 @@ export class Ship {
     this.range = SHIP.defaultRange;
     this.thrustLevel = 0; this.bank = 0; this.yawRate = 0; this.bendW = 0; this.spin = 0; this.spinRate = 0;
     this.warpW = 0; this.warpV = 0;   // visual warp weight and current warp speed
-    this.jumpW = 0;                    // interstellar fold weight, 0..1, peaks mid-fold
+    this.jumpW = 0; this.spoolW = 0; this.foldVis = 1;   // fold weight (peaks mid-fold), spool-up weight, and the vessel's visibility through the fold
     this.trail = new Trail();
     this._inv = new THREE.Matrix4(); this._invQ = new THREE.Quaternion();
     this.warpFx = new WarpFx(this.group);
@@ -58,19 +58,19 @@ export class Ship {
   approach(obj, gap) { this.cmd = { kind: 'approach', obj, gap }; }   // gap: stop this far outside the object (default SHIP.approachGap)
   orbit(obj, range = this.range) { this.cmd = { kind: 'orbit', obj, range }; }
   keepAtRange(obj, range = this.range) { this.cmd = { kind: 'keep', obj, range }; }
-  stop() { if ((this.cmd.kind === 'warp' || this.cmd.kind === 'jump') && this.cmd.phase !== 'align') return; this.cmd = { kind: 'stop' }; }   // no stopping mid-warp or mid-jump
+  stop() { if ((this.cmd.kind === 'warp' && this.cmd.phase !== 'align') || (this.cmd.kind === 'jump' && this.cmd.phase !== 'spool')) return; this.cmd = { kind: 'stop' }; this.spoolW = 0; }   // no stopping mid-warp or mid-fold; a spool can be cancelled
   /** warp: align first (nose on target, 75% speed), then the warp phases run outside normal physics */
   warpTo(obj) {
     if (obj.position.distanceTo(this.group.position) < WARP.minDist) return false;
     this.cmd = { kind: 'warp', obj, phase: 'align', t: 0 };
     return true;
   }
-  get warping() { return (this.cmd.kind === 'warp' || this.cmd.kind === 'jump') && this.cmd.phase !== 'align'; }
+  get warping() { return (this.cmd.kind === 'warp' && this.cmd.phase !== 'align') || this.cmd.kind === 'jump'; }
   /** jump to another system: align on a direction, then charge / fold / arrive. onSwap() is called mid-fold to swap the world. */
   /** onSwap must return the new home position (the run-in ends just short of it) */
-  jumpTo(system, onSwap) {
+  jumpTo(system, onSwap, onDone) {
     const dir = new THREE.Vector3(1, 0, -0.4).normalize();
-    const c = { kind: 'jump', system, phase: 'align', t: 0, dir, swapped: false };
+    const c = { kind: 'jump', system, phase: 'spool', t: 0, dir, swapped: false, onDone };
     c.onSwap = () => { c.home = onSwap().clone(); };
     this.cmd = c;
     return true;
@@ -90,7 +90,7 @@ export class Ship {
       case 'keep': return `Keeping ${n} at ${c.range}`;
       case 'direct': return 'Manual';
       case 'warp': return c.phase === 'align' ? `Aligning to ${n}` : `Warping to ${n}`;
-      case 'jump': return c.phase === 'align' ? `Aligning for the fold to ${c.system.name}` : c.phase === 'charge' ? 'Charging the fold' : c.phase === 'fold' ? `Folding to ${c.system.name}` : `Arriving at ${c.system.name}`;
+      case 'jump': return c.phase === 'spool' ? `Spooling the fold to ${c.system.name}` : c.phase === 'fold' ? `Folding to ${c.system.name}` : `Arriving at ${c.system.name}`;
       default: return 'Stopped';
     }
   }
@@ -102,7 +102,7 @@ export class Ship {
     out.set(0, 0, 0);
     if (c.kind === 'direction') return out.copy(c.dir).multiplyScalar(max);
     if (c.kind === 'warp') return c.phase === 'align' ? out.copy(c.obj.position).sub(p).normalize().multiplyScalar(SHIP.maxSpeed) : out;
-    if (c.kind === 'jump') return c.phase === 'align' ? out.copy(c.dir).multiplyScalar(SHIP.maxSpeed) : out;
+    if (c.kind === 'jump') return out;
     if (c.kind === 'direct') return out.copy(c.input).multiplyScalar(max);
     if (c.kind === 'goto' || c.kind === 'approach' || c.kind === 'keep') {
       let goal = c.point, stopAt = SHIP.arrive;
@@ -141,41 +141,44 @@ export class Ship {
   }
 
   /** warp phases: accel -> cruise -> brake -> exit. Position is driven directly; returns true while it owns the ship */
-  /** interstellar jump phases. Position runs along a straight line at rising speed; the fold weight drives the visuals. */
+  /** interstellar jump phases: spool (the ship comes to rest while the fold winds up around it) -> fold -> arrive.
+   *  No warp run-up: the ship never accelerates, space bends instead. The fold weight drives the visuals. */
   updateJump(dt) {
     const c = this.cmd, g = this.group;
     this.yawRate = 0;
-    if (c.phase === 'align') {
-      this.forward(_fwd);
-      const aligned = _fwd.angleTo(c.dir) < WARP.alignAngle && this.speed >= SHIP.maxSpeed * WARP.alignSpeed * this.throttle;
-      if (aligned || (c.t += dt) > 8) { c.phase = 'charge'; c.t = 0; this.warpV = this.speed; }
-      return false;
-    }
     c.t += dt;
-    let f = 0;   // fold weight
-    if (c.phase === 'charge') { f = c.t / JUMP.charge * 0.6; this.warpV += (WARP.speed - this.warpV) * damp(1.6, dt); if (c.t >= JUMP.charge) { c.phase = 'fold'; c.t = 0; } }
-    else if (c.phase === 'fold') {
-      f = 0.6 + 0.4 * Math.sin(Math.min(1, c.t / JUMP.fold) * Math.PI);
-      this.warpV += (JUMP.speed - this.warpV) * damp(2.5, dt);
+    let f = 0;
+    this.foldVis = 1;
+    if (c.phase === 'spool') {
+      // come to rest, then the fold gathers: weight climbs slowly with a pulse riding on it
+      this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt)); this.speed = this.vel.length(); g.position.addScaledVector(this.vel, dt);
+      const u = Math.min(1, c.t / JUMP.spool);
+      f = 0.45 * u * u + 0.06 * Math.sin(c.t * 9) * u;
+      this.spoolW = u;
+      if (c.t >= JUMP.spool) { c.phase = 'fold'; c.t = 0; }
+    } else if (c.phase === 'fold') {
+      f = 0.45 + 0.55 * Math.sin(Math.min(1, c.t / JUMP.fold) * Math.PI);
+      this.spoolW = 1 - Math.min(1, c.t / 0.8);
+      // the vessel dissolves into the fold before the swap and re-forms after it
+      const half = JUMP.fold * 0.5;
+      this.foldVis = c.t < half ? 1 - Math.pow(c.t / half, 1.6) : Math.pow((c.t - half) / half, 1.4);
       if (!c.swapped && c.t >= JUMP.fold * 0.5) { c.swapped = true; c.onSwap && c.onSwap(); c.postT = 0; c.postTotal = JUMP.fold * 0.5 + JUMP.arrive; c.postD = JUMP.dropDist; }
       if (c.t >= JUMP.fold) { c.phase = 'arrive'; c.t = 0; }
     } else if (c.phase === 'arrive') {
-      f = 0.6 * (1 - c.t / JUMP.arrive);
-      if (c.t >= JUMP.arrive) { this.cmd = { kind: 'stop' }; this.vel.copy(c.dir).multiplyScalar(SHIP.maxSpeed * WARP.exitSpeed); this.speed = this.vel.length(); this.jumpW = 0; return true; }
+      f = 0.45 * (1 - c.t / JUMP.arrive);
+      this.foldVis = 1;
+      if (c.t >= JUMP.arrive) { this.cmd = { kind: 'stop' }; this.vel.copy(c.dir).multiplyScalar(SHIP.maxSpeed * WARP.exitSpeed); this.speed = this.vel.length(); this.jumpW = 0; this.spoolW = 0; c.onDone && c.onDone(); return true; }
     }
     if (c.swapped) {
-      // after the swap the ship is on a fixed run-in: it decelerates along its line to stop just short of the home site
+      // after the swap the ship is on a fixed run-in: it decelerates along its line to the arrival point
       c.postT += dt;
       const u = Math.min(1, c.postT / c.postTotal), rem = c.postD * (1 - u) * (1 - u);
-      g.position.copy(c.home).addScaledVector(c.dir, -(JUMP.dropGap + rem));
-      this.warpV = Math.max(SHIP.maxSpeed * WARP.exitSpeed, 2 * c.postD * (1 - u) / c.postTotal);
-    } else {
-      g.position.addScaledVector(c.dir, Math.min(this.warpV, WARP.speed) * dt);
+      g.position.copy(c.home).addScaledVector(c.dir, -rem);
+      this.vel.copy(c.dir).multiplyScalar(Math.max(SHIP.maxSpeed * WARP.exitSpeed, 2 * c.postD * (1 - u) / c.postTotal)); this.speed = this.vel.length();
+      _m.lookAt(g.position, _r.copy(g.position).add(c.dir), UP); _q.setFromRotationMatrix(_m); g.quaternion.slerp(_q, damp(6, dt));
     }
-    this.vel.copy(c.dir).multiplyScalar(this.warpV); this.speed = this.warpV;
-    _m.lookAt(g.position, _r.copy(g.position).add(c.dir), UP); _q.setFromRotationMatrix(_m); g.quaternion.slerp(_q, damp(6, dt));
     this.jumpW += (clamp(f, 0, 1) - this.jumpW) * damp(4, dt);
-    this.warpW += (clamp(this.warpV / WARP.speed * 1.4, 0, 1) - this.warpW) * damp(2.5, dt);
+    this.warpW += (0 - this.warpW) * damp(3, dt);
     return true;
   }
 
@@ -265,7 +268,8 @@ export class Ship {
     // so the body carries no rotation of its own.
     const ws = this.warpW;   // warp: stretch the vessel along its axis (the trail lay-out reads this scale)
     const js = this.jumpW;
-    this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35 - js * 0.3), SHIP.scale * (1 - ws * 0.35 - js * 0.3), SHIP.scale * (1 + ws * WARP.stretch + js * JUMP.stretch));
+    const fv = this.cmd.kind === 'jump' ? 0.15 + 0.85 * this.foldVis : 1;   // shrink into the fold, grow back out of it
+    this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35 - js * 0.3) * fv, SHIP.scale * (1 - ws * 0.35 - js * 0.3) * fv, SHIP.scale * (1 + ws * WARP.stretch + js * JUMP.stretch) * fv);
     this.trail.push(g.position, this.forward(_fwd));
     this.body.rotation.set(0, 0, 0);
     g.updateMatrixWorld(true);
@@ -273,10 +277,12 @@ export class Ship {
     this._invQ.setFromRotationMatrix(this._inv).normalize();
     this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
     this.warpFx.update(dt, this.warpW, this.warpV, this.jumpW);
+    this.warpFx.spool(dt, this.spoolW, this.jumpW);
     // distance fade: the glow sprites have a fixed world size, so from far away they bloom into a single blob. Scale their
     // opacity by camera distance. Designs set opacities in their own update; we remember what we applied to tell a fresh value apart.
-    const fade = clamp(SHIP.glowNear / Math.max(1, this.camDist || 0), SHIP.glowMin, 1) * (1 - this.warpW * 0.3);
-    const lineFade = clamp(SHIP.glowNear * 2 / Math.max(1, this.camDist || 0), SHIP.lineMin, 1);   // strands fade gentler so the shape stays readable
+    const vis = this.cmd.kind === 'jump' ? this.foldVis : 1;
+    const fade = clamp(SHIP.glowNear / Math.max(1, this.camDist || 0), SHIP.glowMin, 1) * (1 - this.warpW * 0.3) * vis;
+    const lineFade = clamp(SHIP.glowNear * 2 / Math.max(1, this.camDist || 0), SHIP.lineMin, 1) * vis;   // strands fade gentler so the shape stays readable
     this.model.group.traverse((o) => {
       const isSprite = o.isSprite, isLine = (o.isLine || o.isPoints) && o.material.transparent;
       if (!isSprite && !isLine) return;
