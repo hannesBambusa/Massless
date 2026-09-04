@@ -46,11 +46,12 @@ export const DIRECT = {
 
 export const WORLD = {
   size: 1600,          // asteroids spawn in a cube this wide around the origin
-  asteroids: 40,       // rocks per site cluster
+  asteroids: 40,       // condensates per harvest site
+  asteroidsCombat: 8,  // condensates per combat site
   clusterRadius: 700,
   stars: [3000, 1800, 900],   // stars per parallax layer, far to near
   starRadius: [900, 500, 250],
-  streams: 7,          // helical energy streams through the sector
+  streams: 4,          // helical energy streams per harvest site
   overviewRange: 400,  // rocks listed in the overview (sites are always listed)
   auUnits: 2500,       // world units per AU for the HUD (local distances stay in m)
 };
@@ -84,8 +85,20 @@ export const ROCK = {             // energy condensates: the harvestable things
   motesPerRadius: 5,
 };
 
+/** the kinds of bound energy a condensate can be made of. key: inventory slot, name: what the player sees */
+export const ENERGY = [
+  { key: 'glacis', name: 'Glacis', color: 0x9be7ff, desc: 'cold, slow, dense' },
+  { key: 'sol', name: 'Sol', color: 0xffd166, desc: 'warm, radiant' },
+  { key: 'cerule', name: 'Cerule', color: 0x60a5fa, desc: 'deep, resonant' },
+  { key: 'ember', name: 'Ember', color: 0xffb347, desc: 'hot, unstable' },
+  { key: 'lumen', name: 'Lumen', color: 0xffffff, desc: 'pure, rare' },
+  { key: 'ash', name: 'Ash', color: 0xff3d7a, desc: 'what a wisp leaves behind' },
+];
+export const ENERGY_BY_KEY = Object.fromEntries(ENERGY.map((e) => [e.key, e]));
+
 export const MOB = {              // wisps
-  perSite: 3,
+  perSite: 1,          // wisps at a harvest site
+  perCombatSite: 6,    // wisps pouring out of a rift
   hp: 70,
   speed: 34,
   aggroRange: 180,     // starts hunting when the ship is this close

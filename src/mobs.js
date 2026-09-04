@@ -8,11 +8,15 @@ import { rnd, damp, clamp, TAU } from './utils.js';
 const TENDRILS = 7, SAMPLES = 16;
 
 export class Mobs {
-  constructor(scene, centres) {
+  /** sites: the site groups; wisps are few at harvest sites and swarm around rifts */
+  constructor(scene, sites) {
     this.group = new THREE.Group(); scene.add(this.group);
     this.list = [];
     let n = 0;
-    for (const c of centres) for (let i = 0; i < MOB.perSite; i++) this.list.push(this.spawn(c, n++));
+    for (const st of sites) this.populate(st);
+  }
+  populate(st) {
+    for (let i = 0, c = st.type === 'combat' ? MOB.perCombatSite : MOB.perSite; i < c; i++) { const m = this.spawn(st.position, this.list.length); m.site = st; this.list.push(m); }
     this._d = new THREE.Vector3(); this._tmp = new THREE.Vector3();
   }
 

@@ -11,6 +11,7 @@ import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
 import { Streams } from './streams.js';
 import { Sites } from './sites.js';
+import { Rifts } from './rift.js';
 import { Lance } from './weapons/lance.js';
 import { Loot } from './loot.js';
 import { Mobs } from './mobs.js';
@@ -47,15 +48,19 @@ const rim = new THREE.DirectionalLight(0x4ff2ff, 1.2); rim.position.set(30, -10,
 
 
 const sites = new Sites(scene);
+const harvestSites = sites.list.filter((x) => x.type === 'harvest'), combatSites = sites.list.filter((x) => x.type === 'combat');
+const streams = new Streams(scene, harvestSites.map((x) => x.position));
 const game = {
-  scene, camera, state: { scrap: 0 }, direct: false, sites,
-  ship: new Ship(scene), stars: new Starfield(scene), rocks: new Asteroids(scene, sites.list.map((x) => x.position)), streams: new Streams(scene), marker: new Marker(scene),
+  scene, camera, state: { scrap: 0 }, direct: false, sites, streams,
+  ship: new Ship(scene), stars: new Starfield(scene), rocks: new Asteroids(scene, sites.list, streams), marker: new Marker(scene),
 };
-game.mobs = new Mobs(scene, sites.list.map((x) => x.position));
+game.mobs = new Mobs(scene, sites.list);
+game.rifts = new Rifts(scene, combatSites);
 game.selection = new Selection(scene, camera);
 game.lance = new Lance(scene, game.ship);
-game.loot = new Loot(scene, game.ship, (n) => { game.state.scrap += n; });
-const { ship, rocks, selection, marker, stars, streams } = game;
+game.state.hold = {};   // collected energy by key
+game.loot = new Loot(scene, game.ship, (key, n) => { game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; });
+const { ship, rocks, selection, marker, stars } = game;
 
 /** run a command against the selected target (or stop) */
 game.command = (name) => {
@@ -203,18 +208,29 @@ function frame(now) {
   ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);
   rocks.update(dt, (rock) => {
-    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint);
+    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint, rock.energy.key);
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
   });
   game.mobs.update(dt, ship, (mob) => {
-    game.loot.burst(mob.position, 14, MOB.scrap / 14, 0xff3d7a);
+    game.loot.burst(mob.position, 14, MOB.scrap / 14, 0xff3d7a, 'ash');
     if (selection.obj === mob) selection.clear();
     if (ship.cmd.obj === mob) ship.stop();
+    // last wisp of a combat site: the rift collapses and a new tear opens elsewhere in the system
+    const st = mob.site;
+    if (st && st.type === 'combat' && !game.mobs.list.some((m) => m.site === st)) {
+      const rift = game.rifts.list.find((r) => r.site === st);
+      if (rift) game.rifts.collapse(rift);
+      st.type = 'cleared';
+      const fresh = sites.spawnCombat();
+      game.rifts.add(fresh); game.mobs.populate(fresh); rocks.populate(fresh, null);
+      ui.flash(`${st.name} rift collapsed. A new tear opens at ${fresh.name}`);
+    }
   });
   game.lance.update(dt);
   game.loot.update(dt);
   streams.update(dt);
+  game.rifts.update(dt);
   sites.update(dt, camera.position);
   updateWarpLook();
   selection.update(dt);

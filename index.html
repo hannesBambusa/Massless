@@ -34,7 +34,7 @@
     <div class="stat cyan"><span class="lbl">Sector</span><span id="hud-sector">Alpha Reach</span></div>
     <div class="stat"><span class="lbl">Speed</span><span id="hud-speed">0</span></div>
     <div class="stat"><span class="lbl">Position</span><span id="hud-pos">0, 0, 0</span></div>
-    <div class="stat gold"><span class="lbl">Scrap</span><span id="hud-scrap">0</span></div>
+    <div class="stat gold"><span class="lbl">Bound</span><span id="hud-scrap">0</span></div>
     <div class="spacer"></div>
     <div id="hud-modes"><button data-hud="nav" class="on" title="Navigation HUD (1)">Nav</button><button data-hud="harvest" title="Harvest HUD (2)">Harvest</button><button data-hud="combat" title="Combat HUD (3)">Combat</button></div>
     <select id="sel-design" title="Ship design"></select>
@@ -85,7 +85,7 @@
     </div>
     <div class="cmd-extra harvest-info">
       <span class="lbl">Yield</span><span class="big"><span id="yield-num">0</span><small>/ <span id="yield-max">0</span></small></span>
-      <span class="lbl">scrap bound in the condensate</span>
+      <span class="lbl" id="yield-kind">energy bound in the condensate</span>
     </div>
     <div class="cmd-extra combat-info">
       <span class="lbl">Threat</span><span class="big small" id="threat-name">No hostile locked</span><span id="threat-dist" class="muted"></span>
@@ -96,6 +96,8 @@
     <div class="ticks bottom"></div>
     <div id="cmd-hp" hidden><div class="track"><div id="cmd-hp-fill" class="fill"></div></div></div>
   </div>
+
+  <div id="hold"><div class="hold-title">Hold</div><div id="hold-list"></div></div>
 
   <div id="flash"></div>
 

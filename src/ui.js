@@ -1,7 +1,7 @@
 // HTML overlay: HUD numbers, command bar, throttle, overview list, mode toggle. Reads game state, writes DOM, fires callbacks.
 import * as THREE from 'three';
 import { fmt, fmtDist } from './utils.js';
-import { SHIP, WORLD } from './config.js';
+import { SHIP, WORLD, ENERGY_BY_KEY } from './config.js';
 import { DESIGNS } from './ships/index.js';
 import { HudFx, setHudDt } from './hudfx.js';
 
@@ -12,7 +12,7 @@ const el = {
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
   design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
-  yield: $('yield-num'), yieldMax: $('yield-max'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
+  yield: $('yield-num'), yieldMax: $('yield-max'), yieldKind: $('yield-kind'), holdList: $('hold-list'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
 
 export class UI {
@@ -48,6 +48,21 @@ export class UI {
       const r0 = i % 6 === 0 ? 52 : 54, r1 = 55.5;
       l.setAttribute('x1', 60 + Math.cos(a) * r0); l.setAttribute('y1', 60 + Math.sin(a) * r0); l.setAttribute('x2', 60 + Math.cos(a) * r1); l.setAttribute('y2', 60 + Math.sin(a) * r1);
       el.gTicks.appendChild(l);
+    }
+  }
+  /** the hold: one row per energy collected, bumping when it grows */
+  updateHold() {
+    const hold = this.game.state.hold; this.holdRows = this.holdRows || new Map();
+    for (const key in hold) {
+      const e = ENERGY_BY_KEY[key]; if (!e) continue;
+      let row = this.holdRows.get(key);
+      if (!row) {
+        row = document.createElement('div'); row.className = 'hold-row'; row.style.setProperty('--c', '#' + e.color.toString(16).padStart(6, '0'));
+        row.innerHTML = `<i></i><span class="name">${e.name}</span><span class="n">0</span>`;
+        el.holdList.appendChild(row); this.holdRows.set(key, row); row.last = 0;
+      }
+      const n = Math.floor(hold[key]);
+      if (n !== row.last) { row.last = n; row.querySelector('.n').textContent = n; row.classList.remove('bump'); void row.offsetWidth; row.classList.add('bump'); }
     }
   }
   /** a manual pick holds the state for a while before the HUD goes back to following the target */
@@ -124,7 +139,8 @@ export class UI {
     const threat = this.game.mobs.list.find((m) => m.hunting && m.position.distanceTo(p) < 120);
     const want = (sel && sel.kind === 'mob') || threat ? 'combat' : sel && sel.kind === 'cloud' ? 'harvest' : 'nav';
     if (want !== this.hud && !this.hudLock) this.setHud(want);
-    if (this.hud === 'harvest' && sel && sel.hpMax) { el.yield.textContent = Math.round(sel.radius * 4 * (sel.hp / sel.hpMax)); el.yieldMax.textContent = Math.round(sel.radius * 4); }
+    if (this.hud === 'harvest' && sel && sel.hpMax) { el.yield.textContent = Math.round(sel.radius * 4 * (sel.hp / sel.hpMax)); el.yieldMax.textContent = Math.round(sel.radius * 4); if (sel.energy) el.yieldKind.textContent = `${sel.energy.name} bound in the condensate`; }
+    this.updateHold();
     if (this.hud === 'combat') { const foe = sel && sel.kind === 'mob' ? sel : threat; el.threat.textContent = foe ? `${foe.name} · ${Math.round(foe.hp)} / ${foe.hpMax}` : 'No hostile locked'; el.threatDist.textContent = foe ? fmtDist(foe.position.distanceTo(p), WORLD.auUnits) : ''; el.shieldNum.textContent = Math.round(ship.shield) + ' / ' + ship.shieldMax; }
 
     // overview: refresh a few times a second, rows keyed by object

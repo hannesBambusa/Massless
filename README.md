@@ -31,7 +31,8 @@ Then open http://localhost:8766/
 | `src/hudfx.js` | living HUD layer: a canvas drawing petal strands, motes, edge strands and the overview thread every frame |
 | `src/marker.js` | destination marker |
 | `src/starfield.js` | parallax star shells and nebulas |
-| `src/sites.js` | named sites across the system: beacons you can warp between, each with a rock cluster |
+| `src/sites.js` | named sites across the system, typed `harvest` or `combat`. Harvest sites have streams with condensates grown on them by arcing tethers; combat sites have a rift |
+| `src/rift.js` | rifts: a torn core with crawling cracks, orbiting shards and bleeding sparks. Wisps swarm here. Kill the last one and the rift collapses, the site is marked cleared, and a new combat site opens somewhere else in the system |
 | `src/warpfx.js` | warp tunnel streaks |
 | `src/asteroids.js` | energy condensates (the harvestable clouds) around each site: hp, shiver under fire, removal |
 | `src/mobs.js` | wisps: hostile energy entities that hunt the ship and bleed its shield |
@@ -53,6 +54,10 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 ## HUD
 
 One HUD with three states it morphs between: **Nav** (teal, movement commands forward), **Harvest** (gold, lance and orbit forward, the gauge reads the rock's remaining yield) and **Combat** (red, lance, keep range and track forward, outer ring pulses). The HUD follows what you are dealing with: select a condensate and it unfolds into Harvest with a yield readout; select a wisp, or get hunted by one, and it snaps into Combat with a threat readout and a scanline. Keys 1 / 2 / 3 or the chips force a state for six seconds. States are CSS on `body[data-hud]` in `style.css`.
+
+## Energy
+
+Condensates come in kinds, each a colour and a name: Glacis (ice), Sol (gold), Cerule (blue), Ember (amber) and the rare Lumen (white). Wisps leave Ash. Unbinding one releases motes of that energy which fly to the ship; the Hold panel bottom-left counts what you carry by kind. Defined in `ENERGY` in `src/config.js`.
 
 ## Weapons
 

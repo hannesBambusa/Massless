@@ -283,3 +283,14 @@ body[data-hud="harvest"] { --hud-rate: 1.4; }
 #cmd[data-kind="site"] .mob-only, #cmd[data-kind="none"] .mob-only { display: none; }
 #cmd[data-kind="cloud"] .cmd-row #cmd-ranges, #cmd[data-kind="cloud"] .cmd-row .lbl:first-child { display: none; }
 #cmd[data-kind="cloud"] .cmd-buttons button { width: 62px; }
+
+/* ---------- hold: what you have collected, by energy ---------- */
+#hold { position: fixed; left: 20px; bottom: 96px; z-index: 5; pointer-events: none; min-width: 150px; }
+.hold-title { font-family: var(--font-head); font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.hold-row { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; font-size: 13px; padding: 2px 0; }
+.hold-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.hold-row .name { font-family: var(--font-head); font-size: 10px; letter-spacing: 1px; color: var(--c); }
+.hold-row .n { font-variant-numeric: tabular-nums; color: var(--text); }
+.hold-row.bump .n { animation: bump 0.5s ease-out; }
+@keyframes bump { 0% { transform: scale(1.4); color: #fff; } 100% { transform: scale(1); } }
+#hold:empty { display: none; }

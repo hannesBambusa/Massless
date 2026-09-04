@@ -7,10 +7,10 @@ import { rnd, TAU, pick } from './utils.js';
 const SPINE_PTS = 14, SAMPLES = 260, STRANDS = 3, SPARKS = 220;
 const palettes = [[COLORS.gold, COLORS.amber, COLORS.white], [COLORS.sky, COLORS.ice, COLORS.white], [COLORS.gold, COLORS.sky, COLORS.ice]];
 
-function spine() {
-  const half = WORLD.size / 2, pts = [];
+function spine(centre) {
+  const half = WORLD.clusterRadius * 0.6, pts = [];
   const dir = new THREE.Vector3(rnd(-1, 1), rnd(-0.25, 0.25), rnd(-1, 1)).normalize();
-  const start = new THREE.Vector3(rnd(-half, half), rnd(-half * 0.3, half * 0.3), rnd(-half, half)).addScaledVector(dir, -WORLD.size * 0.6);
+  const start = centre.clone().add(new THREE.Vector3(rnd(-half, half), rnd(-half * 0.3, half * 0.3), rnd(-half, half))).addScaledVector(dir, -WORLD.size * 0.6);
   const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
   for (let i = 0; i < SPINE_PTS; i++) {
     const t = i / (SPINE_PTS - 1);
@@ -23,15 +23,22 @@ function spine() {
 }
 
 export class Streams {
-  constructor(scene) {
+  /** centres: harvest site positions; each gets WORLD.streams streams winding through it */
+  constructor(scene, centres) {
     this.group = new THREE.Group();
     this.items = [];
-    for (let n = 0; n < WORLD.streams; n++) this.items.push(this.build(pick(palettes)));
+    for (const c of centres) for (let n = 0; n < WORLD.streams; n++) this.items.push(this.build(pick(palettes), c));
     scene.add(this.group);
   }
+  /** a random point on a stream near `centre` (within `within`), for growing condensates on; null if none */
+  randomPointNear(centre, within) {
+    const cand = [];
+    for (const it of this.items) for (const pts of it.strandPts) for (let i = 0; i < pts.length; i += 6) if (pts[i].distanceTo(centre) < within) cand.push(pts[i]);
+    return cand.length ? pick(cand).clone() : null;
+  }
 
-  build(palette) {
-    const curve = spine(), frames = curve.computeFrenetFrames(SAMPLES, false);
+  build(palette, centre) {
+    const curve = spine(centre), frames = curve.computeFrenetFrames(SAMPLES, false);
     const R = rnd(14, 30), twist = rnd(2.5, 4.5) * TAU, phase0 = rnd(0, TAU);
     const strandPts = [];
     const p = new THREE.Vector3();

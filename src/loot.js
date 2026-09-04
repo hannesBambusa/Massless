@@ -19,27 +19,28 @@ export class Loot {
     this._d = new THREE.Vector3();
   }
   /** release n motes at p, each worth `value` scrap */
-  burst(p, n, value, color = COLORS.gold) {
+  /** key: which energy this is (inventory slot) */
+  burst(p, n, value, color = COLORS.gold, key = 'sol') {
     const c = new THREE.Color(color);
     for (let i = 0; i < n && this.items.length < MAX; i++) {
       const v = new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(4, 14));
-      this.items.push({ p: p.clone(), v, age: 0, value, c: c.clone().multiplyScalar(rnd(0.8, 1.6)) });
+      this.items.push({ p: p.clone(), v, age: 0, value, key, c: c.clone().multiplyScalar(rnd(0.8, 1.6)) });
     }
   }
   update(dt) {
     const ship = this.ship.position;
-    let gained = 0;
+    const gained = {};
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]; it.age += dt;
       if (it.age > 0.5) {   // after the burst, home in with growing pull
         this._d.copy(ship).sub(it.p); const d = this._d.length(); this._d.normalize();
         it.v.addScaledVector(this._d, (30 + it.age * 40) * dt);
         it.v.multiplyScalar(Math.max(0, 1 - 1.5 * dt));
-        if (d < 3 + this.ship.speed * 0.05) { gained += it.value; this.items.splice(i, 1); continue; }
+        if (d < 3 + this.ship.speed * 0.05) { gained[it.key] = (gained[it.key] || 0) + it.value; this.items.splice(i, 1); continue; }
       }
       it.p.addScaledVector(it.v, dt);
     }
-    if (gained) this.onCollect(gained);
+    for (const k in gained) this.onCollect(k, gained[k]);
     for (let i = 0; i < MAX; i++) {
       const it = this.items[i];
       if (it) { this.pos.set([it.p.x, it.p.y, it.p.z], i * 3); this.col.set([it.c.r, it.c.g, it.c.b], i * 3); }
