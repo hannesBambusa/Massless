@@ -10,6 +10,7 @@ const el = {
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
   design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
 };
 
 export class UI {
@@ -30,8 +31,29 @@ export class UI {
     el.design.value = game.ship.design;
     el.design.addEventListener('change', () => { game.ship.setDesign(el.design.value); el.design.blur(); });
     el.mode.addEventListener('click', () => game.toggleMode());
+    for (const b of document.querySelectorAll('#hud-modes button')) b.addEventListener('click', () => this.setHud(b.dataset.hud));
+    this.setHud('nav', true);
+    window.addEventListener('keydown', (e) => {
+      if (e.target !== document.body) return;
+      if (e.code === 'Digit1') this.setHud('nav'); if (e.code === 'Digit2') this.setHud('harvest'); if (e.code === 'Digit3') this.setHud('combat');
+    });
     el.track.addEventListener('click', () => game.toggleTrack());
     this.proj = new THREE.Vector3();
+    // gauge ticks: 24 short radial lines around the outer ring
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2, l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const r0 = i % 6 === 0 ? 52 : 54, r1 = 55.5;
+      l.setAttribute('x1', 60 + Math.cos(a) * r0); l.setAttribute('y1', 60 + Math.sin(a) * r0); l.setAttribute('x2', 60 + Math.cos(a) * r1); l.setAttribute('y2', 60 + Math.sin(a) * r1);
+      el.gTicks.appendChild(l);
+    }
+  }
+  /** morph the HUD into one of its states: nav | harvest | combat */
+  setHud(mode, silent = false) {
+    if (this.hud === mode) return;
+    this.hud = mode;
+    document.body.dataset.hud = mode;
+    for (const b of document.querySelectorAll('#hud-modes button')) b.classList.toggle('on', b.dataset.hud === mode);
+    if (!silent) { document.body.classList.remove('morphing'); void document.body.offsetWidth; document.body.classList.add('morphing'); }
   }
   flash(msg) { el.flash.textContent = msg; el.flash.classList.add('on'); clearTimeout(this.flashT); this.flashT = setTimeout(() => el.flash.classList.remove('on'), 2200); }
   setTracking(on) { el.track.classList.toggle('on', on); }
@@ -84,6 +106,11 @@ export class UI {
     else { el.cmdTitle.textContent = 'No target'; el.cmdDist.textContent = ''; }
     el.hp.hidden = !(sel && sel.hpMax);
     if (sel && sel.hpMax) el.hpFill.style.width = (sel.hp / sel.hpMax * 100) + '%';
+    // gauge rings: outer = target hp, inner = lance lock
+    const hpF = sel && sel.hpMax ? sel.hp / sel.hpMax : 0;
+    el.gHp.style.strokeDashoffset = 314.2 * (1 - hpF);
+    el.gLock.style.strokeDashoffset = 238.8 * (1 - (lance.on && lance.target === sel ? lance.lock : 0));
+    el.gSpeed.style.strokeDashoffset = 364.4 * (1 - Math.min(1, ship.speed / SHIP.maxSpeed));
 
     // overview: refresh a few times a second, rows keyed by object
     this.overviewTimer -= dt;
@@ -96,13 +123,14 @@ export class UI {
       let row = this.rows.get(o);
       if (!row) {
         row = document.createElement('div'); row.className = 'ov-row' + (o.kind === 'site' ? ' site' : '');
-        row.innerHTML = `<span class="ov-name"></span><span class="ov-dist"></span>`;
+        row.innerHTML = `<span class="ov-node"></span><span class="ov-name"></span><span class="ov-dist"></span><span class="ov-bar"></span>`;
         row.addEventListener('click', () => selection.set(o));
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
         row.addEventListener('dblclick', () => { selection.set(o); this.game.command('approach'); });
         this.rows.set(o, row);
       }
-      row.firstChild.textContent = o.name; row.lastChild.textContent = fmtDist(d, WORLD.auUnits);
+      row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
+      row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
       row.classList.toggle('on', o === sel);
       el.overview.appendChild(row); keep.add(o);
     }

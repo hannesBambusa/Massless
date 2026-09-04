@@ -63,7 +63,7 @@ game.command = (name) => {
   if (name === 'approach') ship.approach(t);
   if (name === 'orbit') ship.orbit(t);
   if (name === 'keep') ship.keepAtRange(t);
-  if (name === 'lance') { if (!t.hp) ui.flash('Nothing to unbind there'); else game.lance.toggle(t); }
+  if (name === 'lance') { if (!t.hp) ui.flash('Nothing to unbind there'); else { game.lance.toggle(t); if (game.lance.on && t.kind === 'asteroid' && ui.hud === 'nav') ui.setHud('harvest'); } }
   if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
 };
 /** select obj; if the ship is busy with a target command, re-issue it against the new target */

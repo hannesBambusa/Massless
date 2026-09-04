@@ -48,6 +48,10 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 | **Bloom** | strands unfold into petals around the core | strands bundle into a spiral lance with a hot nose | strands wrap into a tilted halo |
 | **Prism** | prow retracts, gold lattices tilt open into a mandala, rings drift, tendrils bristle | prow extends, lattices face forward, rings stack, tendrils sweep back, helix wake stretches | same as moving |
 
+## HUD
+
+One HUD with three states it morphs between: **Nav** (teal, movement commands forward), **Harvest** (gold, lance and orbit forward, the gauge reads the rock's remaining yield) and **Combat** (red, lance, keep range and track forward, outer ring pulses). Keys 1 / 2 / 3 or the chips in the top bar. Firing the lance on a rock from Nav slides into Harvest. States are CSS on `body[data-hud]` in `style.css`.
+
 ## Weapons
 
 Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F, or the Lance button) is a sustained beam on the selected rock: lock builds over a second while the target stays within 60 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Orbit at 30 to hold the beam.

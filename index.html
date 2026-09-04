@@ -23,56 +23,78 @@
       <symbol id="i-lance" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.5"/><path d="M7.5 12c3-3 6 3 9 0M7.5 12c3 3 6-3 9 0"/><circle cx="19.5" cy="12" r="2" class="fill"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
       <symbol id="i-track" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" class="fill"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
-      <symbol id="i-site" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/><circle cx="12" cy="12" r="2" class="fill"/></symbol>
-      <symbol id="i-rock" viewBox="0 0 24 24"><path d="M7 4h10l4 7-4 9H7l-4-9z"/></symbol>
     </defs>
   </svg>
 
+  <!-- top: readouts as a strand of energy -->
   <div id="topbar">
-    <div class="brand">MASSLESS</div>
+    <div class="brand"><span class="brand-core"></span>MASSLESS</div>
+    <div class="strand"></div>
     <div class="stat cyan"><span class="lbl">Sector</span><span id="hud-sector">Alpha Reach</span></div>
     <div class="stat"><span class="lbl">Speed</span><span id="hud-speed">0</span></div>
     <div class="stat"><span class="lbl">Position</span><span id="hud-pos">0, 0, 0</span></div>
     <div class="stat gold"><span class="lbl">Scrap</span><span id="hud-scrap">0</span></div>
     <div class="spacer"></div>
+    <div id="hud-modes"><button data-hud="nav" class="on" title="Navigation HUD (1)">Nav</button><button data-hud="harvest" title="Harvest HUD (2)">Harvest</button><button data-hud="combat" title="Combat HUD (3)">Combat</button></div>
     <select id="sel-design" title="Ship design"></select>
-    <button id="btn-mode" title="Toggle command / direct flight (V)">COMMAND</button>
+    <button id="btn-mode" class="chip" title="Toggle command / direct flight (V)">COMMAND</button>
   </div>
 
   <div id="target-label" hidden><span id="tl-arrow">➤</span><span id="tl-name"></span><span id="tl-dist"></span></div>
 
-  <div id="overview" class="panel">
-    <div class="panel-title"><span>Overview</span><span class="panel-sub">nearby</span></div>
+  <!-- overview: a thread with a node per object -->
+  <div id="overview">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div class="ticks"></div>
+    <div class="ov-head"><span class="ov-title">Overview</span><span class="ov-sub">what the core can feel</span></div>
     <div id="overview-list"></div>
+    <div class="ov-foot"></div>
   </div>
 
-  <div id="cmd" class="panel">
-    <div class="cmd-head"><span id="cmd-title">No target</span><span id="cmd-dist"></span></div>
-    <div id="cmd-hp" hidden><div class="track"><div id="cmd-hp-fill" class="fill"></div></div></div>
-    <div class="cmd-buttons">
-      <button data-cmd="approach" title="Approach (Q)"><svg><use href="#i-approach"/></svg><span>Q</span></button>
-      <button data-cmd="orbit" title="Orbit at range (W)"><svg><use href="#i-orbit"/></svg><span>W</span></button>
-      <button data-cmd="keep" title="Keep at range (E)"><svg><use href="#i-keep"/></svg><span>E</span></button>
-      <button data-cmd="warp" title="Warp to target (S)" class="warp"><svg><use href="#i-warp"/></svg><span>S</span></button>
-      <button data-cmd="lance" id="btn-lance" title="Resonance lance (F)" class="lance"><svg><use href="#i-lance"/></svg><span>F</span></button>
-      <button data-cmd="stop" title="Stop (Space)" class="stop"><svg><use href="#i-stop"/></svg><span>␣</span></button>
-      <button id="btn-track" title="Track target with the camera (C)"><svg><use href="#i-track"/></svg><span>C</span></button>
+  <!-- command: a core gauge with command nodes around it -->
+  <div id="cmd">
+    <div class="cmd-gauge">
+      <svg class="gauge" viewBox="0 0 120 120">
+        <circle class="g-seg outer" cx="60" cy="60" r="58"/>
+        <circle class="g-speed" id="g-speed" cx="60" cy="60" r="58"/>
+        <circle class="g-track" cx="60" cy="60" r="50"/>
+        <circle class="g-hp" id="g-hp" cx="60" cy="60" r="50"/>
+        <circle class="g-seg mid" cx="60" cy="60" r="44"/>
+        <circle class="g-track inner" cx="60" cy="60" r="38"/>
+        <circle class="g-lock" id="g-lock" cx="60" cy="60" r="38"/>
+        <circle class="g-seg core" cx="60" cy="60" r="31"/>
+        <g class="g-ticks" id="g-ticks"></g>
+      </svg>
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="gauge-centre"><span id="cmd-dist"></span><span id="cmd-title">No target</span></div>
     </div>
-    <div class="cmd-row"><span class="lbl">Range</span><div id="cmd-ranges"></div></div>
-    <div class="cmd-row"><span class="lbl">Throttle</span><input id="throttle" type="range" min="0" max="100" value="100"><span id="throttle-num">100%</span></div>
-    <div id="cmd-status" class="muted">Stopped</div>
-    <div id="weapon-status"></div>
+    <div class="cmd-side">
+      <div class="cmd-buttons">
+        <button data-cmd="approach" title="Approach (Q)"><svg><use href="#i-approach"/></svg><span>Q</span></button>
+        <button data-cmd="orbit" title="Orbit at range (W)"><svg><use href="#i-orbit"/></svg><span>W</span></button>
+        <button data-cmd="keep" title="Keep at range (E)"><svg><use href="#i-keep"/></svg><span>E</span></button>
+        <button data-cmd="warp" title="Warp to target (S)" class="warp"><svg><use href="#i-warp"/></svg><span>S</span></button>
+        <button data-cmd="lance" id="btn-lance" title="Resonance lance (F)" class="lance"><svg><use href="#i-lance"/></svg><span>F</span></button>
+        <button id="btn-track" title="Track target with the camera (C)"><svg><use href="#i-track"/></svg><span>C</span></button>
+        <button data-cmd="stop" title="Stop (Space)" class="stop"><svg><use href="#i-stop"/></svg><span>␣</span></button>
+      </div>
+      <div class="cmd-row"><span class="lbl">Range</span><div id="cmd-ranges"></div><span class="lbl thr">Throttle</span><input id="throttle" type="range" min="0" max="100" value="100"><span id="throttle-num">100%</span></div>
+      <div class="cmd-lines"><div id="cmd-status" class="muted">Stopped</div><div id="weapon-status"></div></div>
+    </div>
+    <div class="ticks bottom"></div>
+    <div id="cmd-hp" hidden><div class="track"><div id="cmd-hp-fill" class="fill"></div></div></div>
   </div>
 
   <div id="flash"></div>
 
+  <!-- vitals: two arcs of energy bottom-left -->
   <div id="bars">
     <div class="bar shield"><span class="lbl">Shield</span><div class="track"><div id="bar-shield" class="fill"></div></div></div>
     <div class="bar hull"><span class="lbl">Hull</span><div class="track"><div id="bar-hull" class="fill"></div></div></div>
   </div>
 
   <div id="help">
-    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>S</b> warp to site · <b>F</b> lance · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>Space</b> stop · <b>V</b> direct mode</span>
+    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>S</b> warp to site · <b>F</b> lance · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>1 / 2 / 3</b> HUD nav / harvest / combat · <b>Space</b> stop · <b>V</b> direct mode</span>
     <span id="help-direct" hidden><b>W / S</b> thrust · <b>A / D</b> strafe · <b>R / F</b> up / down · <b>Wheel</b> zoom · <b>Space</b> stop · <b>V</b> command mode</span>
     · <b>H</b> hide
   </div>
