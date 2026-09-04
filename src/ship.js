@@ -7,6 +7,7 @@ import { byId } from './ships/index.js';
 import { clamp, damp } from './utils.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
+const _local = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _r = new THREE.Vector3(), _want = new THREE.Vector3(), _fwd = new THREE.Vector3(), _tan = new THREE.Vector3();
 
 export class Ship {
@@ -24,7 +25,7 @@ export class Ship {
     this.cmd = { kind: 'stop' };   // stop | goto {point} | direction {dir} | approach {obj} | orbit {obj, range} | keep {obj, range} | direct {input}
     this.throttle = 1;             // 0..1
     this.range = SHIP.defaultRange;
-    this.thrustLevel = 0; this.bank = 0; this.yawRate = 0;
+    this.thrustLevel = 0; this.bank = 0; this.yawRate = 0; this.bendW = 0; this.spin = 0; this.spinRate = 0;
     this.hull = SHIP.hull; this.hullMax = SHIP.hull;
     this.shield = SHIP.shield; this.shieldMax = SHIP.shield; this.shieldHit = 0;
     this.speed = 0;
@@ -88,7 +89,7 @@ export class Ship {
       const ahead = SHIP.orbitLead * (1 - Math.abs(far) * 0.6);
       _tan.set(_r.x * Math.cos(ahead) - _r.z * Math.sin(ahead), 0, _r.x * Math.sin(ahead) + _r.z * Math.cos(ahead));  // rotate _r by +ahead around Y
       const err = p.distanceTo(c.obj.position) - R;                     // steady-state drift outward from chasing a chord: aim inside by the error
-      _tan.multiplyScalar(Math.max(R * 0.4, R - err * 1.2)).add(c.obj.position); _tan.y = c.obj.position.y;
+      _tan.multiplyScalar(Math.max(R * 0.4, R - err * 1.6)).add(c.obj.position); _tan.y = c.obj.position.y;
       out.copy(_tan).sub(p);
       const d = out.length();
       const vmax = Math.min(max, R * SHIP.turn * 0.75);
@@ -109,7 +110,8 @@ export class Ship {
     g.position.addScaledVector(this.vel, dt);
 
     // nose follows the wanted direction (or the velocity when coasting), level with the world
-    const aim = _want.lengthSq() > 1 ? _want : this.vel;
+    // orbiting: the nose follows the velocity, which runs along the ring; otherwise it leads with the steering vector
+    const aim = (this.cmd.kind === 'orbit' && this.vel.lengthSq() > 4) ? this.vel : (_want.lengthSq() > 1 ? _want : this.vel);
     if (aim.lengthSq() > 1) {
       _m.lookAt(g.position, _r.copy(g.position).add(aim), UP);
       _q.setFromRotationMatrix(_m);
@@ -130,12 +132,37 @@ export class Ship {
       wantBank += side * SHIP.orbitBank;
     }
     this.bank += (wantBank - this.bank) * damp(5, dt);
-    this.body.rotation.z = this.bank;
+    // while bent onto the orbit ring: no roll (it would tilt the bent body out of the ring plane) and yaw the body
+    // from the autopilot's chord heading onto the true tangent, so nose, core and tail all lie on the circle
+    let tangentYaw = 0;
+    if (this.cmd.kind === 'orbit' && this.bendW > 0.01) {
+      _r.copy(g.position).sub(this.cmd.obj.position); _r.y = 0;
+      _tan.crossVectors(_r, UP).normalize();                     // travel direction on the ring, same sense as wanted() (r rotated by +ahead about Y)
+      this.forward(_fwd); _fwd.y = 0; _fwd.normalize();
+      tangentYaw = Math.atan2(_fwd.x * _tan.z - _fwd.z * _tan.x, _fwd.x * _tan.x + _fwd.z * _tan.z);   // signed angle fwd -> tangent about Y
+    }
+    this.bodyYaw = (this.bodyYaw || 0) + ((-tangentYaw * Math.min(1, this.bendW * 1.5)) - (this.bodyYaw || 0)) * damp(6, dt);
+    this.body.rotation.y = this.bodyYaw;
+    this.body.rotation.z = this.bank * (1 - this.bendW);
     this.shield = clamp(this.shield + SHIP.shieldRegen * dt, 0, this.shieldMax);
     this.shieldHit = Math.max(0, this.shieldHit - dt * 3);
     this.shieldFx.update(dt, this.shieldHit, this.shield / this.shieldMax);
     for (const e of this.engines) { const s = 0.9 + this.thrustLevel * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + this.thrustLevel * 0.4; }
-    this.model.update(dt, { thrust: this.thrustLevel, speedFrac: this.speed / SHIP.maxSpeed, orbiting: this.cmd.kind === 'orbit' });
+    // orbit bend: fade in as the ship settles on the ring; radius in the model's local units, centre on the target's side
+    const orbiting = this.cmd.kind === 'orbit';
+    let bendR = 0, bendSide = 1;
+    if (orbiting) {
+      const R = this.cmd.obj.radius + this.cmd.range, d = g.position.distanceTo(this.cmd.obj.position);
+      const onRing = clamp(1 - Math.abs(d - R) / (R * 0.5), 0, 1);
+      this.bendW += (onRing - this.bendW) * damp(2, dt);
+      bendR = R / SHIP.scale;
+      _local.copy(this.cmd.obj.position); g.worldToLocal(_local); bendSide = _local.x >= 0 ? 1 : -1;
+    } else this.bendW += (0 - this.bendW) * damp(3, dt);
+    // corkscrew: roll about the centreline while orbiting, eased in and out
+    this.spinRate += ((orbiting ? SHIP.orbitSpin * this.bendW : 0) - this.spinRate) * damp(2, dt);
+    this.spin = (this.spin + this.spinRate * dt) % (Math.PI * 2);
+    if (!orbiting && this.spinRate < 0.05) this.spin += (0 - this.spin) * damp(1.5, dt);   // settle upright once the spin dies
+    this.model.update(dt, { thrust: this.thrustLevel, speedFrac: this.speed / SHIP.maxSpeed, orbiting, bend: { R: bendR, side: bendSide, w: this.bendW, spin: this.spin } });
   }
 
   damage(n) {

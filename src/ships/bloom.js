@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { COLORS } from '../config.js';
 import { glowSprite } from '../materials.js';
 import { TAU, rnd, damp, clamp } from '../utils.js';
+import { Bender } from './bend.js';
 
 const STRANDS = 16;
 const CTRL = 6;              // control points per strand
@@ -96,19 +97,24 @@ export function build() {
   const ring2 = ring.clone(); ring2.scale.setScalar(0.55); ring2.position.z = -2.4; group.add(ring2);
 
   // tail: two glow sprites the ship scales with thrust (kept as `engines` for the ship code)
-  const engines = [0.5, -0.5].map((x) => { const e = glowSprite(COLORS.cyan, 1.4, 0.7); e.position.set(x, 0, 3.6); group.add(e); return e; });
+  const engines = [0.5, -0.5].map((x) => { const e = glowSprite(COLORS.cyan, 1.4, 0.7); e.position.set(x, 0, 3.6); e.userData.x = x; group.add(e); return e; });
 
   // form weights, smoothed
   const w = { lance: 0, bloom: 1, halo: 0 };
   let t = 0;
   const tmp = new THREE.Vector3();
+  const bend = new Bender();
 
   /** state: { thrust 0..1, speedFrac 0..1, orbiting bool, targetDir (world->local vector or null) } */
   function update(dt, state) {
     t += dt;
-    const wantHalo = state.orbiting ? 1 : 0;
-    const wantLance = state.orbiting ? 0 : clamp(state.speedFrac * 1.6, 0, 1);
-    const wantBloom = 1 - Math.max(wantHalo, wantLance);
+    const b = state.bend || { R: 0, side: 1, w: 0, spin: 0 }; bend.set(b.R, b.side, b.w, b.spin || 0);
+    // speed always drives the lance; orbiting adds a partial halo on top instead of replacing it
+    let wantLance = clamp(state.speedFrac * 1.6, 0, 1);
+    if (state.orbiting) wantLance = Math.max(wantLance, 0.85);   // tight orbits are slow, but the vessel still stretches along the ring
+    const wantHalo = state.orbiting ? 0.4 : 0;
+    wantLance *= 1 - wantHalo;
+    const wantBloom = 1 - wantLance - wantHalo;
     const k = damp(2.5, dt);
     w.lance += (wantLance - w.lance) * k; w.bloom += (wantBloom - w.bloom) * k; w.halo += (wantHalo - w.halo) * k;
     const stretch = 1 + state.thrust * 0.9 + state.speedFrac * 0.8;   // lance tail streams out with thrust and speed
@@ -128,7 +134,7 @@ export function build() {
         pts[c].set(x, y, z);
       }
       s.curve.updateArcLengths();
-      for (let i = 0; i < SAMPLES; i++) { s.curve.getPoint(i / (SAMPLES - 1), tmp); s.pos.set([tmp.x, tmp.y, tmp.z], i * 3); }
+      for (let i = 0; i < SAMPLES; i++) { s.curve.getPoint(i / (SAMPLES - 1), tmp); bend.point(tmp); s.pos.set([tmp.x, tmp.y, tmp.z], i * 3); }
       s.line.geometry.attributes.position.needsUpdate = true;
       s.line.material.opacity = 0.55 + 0.35 * Math.sin(t * 3 * s.speed + s.phase) * 0.5 + 0.2;
     }
@@ -140,16 +146,17 @@ export function build() {
       const r = m.r * (rBloom * w.bloom + rLance * w.lance + rHalo * w.halo);
       const x = Math.cos(m.a) * r, yy = Math.sin(m.a) * Math.sin(m.b) * r, z = Math.sin(m.a) * Math.cos(m.b) * r;
       const flat = 1 - w.halo * 0.75;                             // halo squashes the cloud toward the ring plane
-      mpos.set([x, yy * flat, z * (1 + w.lance * 1.2)], i * 3);
+      mpos.set(bend.xyz(x, yy * flat, z * (1 + w.lance * 1.2)), i * 3);
     }
     mgeo.attributes.position.needsUpdate = true;
 
     // lance extras
+    bend.place(nose, 0, 0, -6.4); bend.place(ring, 0, 0, 0.6 + Math.sin(t * 2) * 0.3); bend.place(ring2, 0, 0, -2.4);
+    ring.rotation.z += t * 2.4; ring2.rotation.z -= t * 3.5;   // the rings' own spin, on top of the placement
+    for (const e of engines) bend.place(e, e.userData.x, 0, 3.6);
     nose.material.opacity = w.lance * (0.6 + 0.3 * Math.sin(t * 9));
     nose.scale.setScalar(0.8 + w.lance * (0.8 + state.thrust * 0.6));
     ringMat.opacity = w.lance * 0.7;
-    ring.rotation.z += dt * 2.4; ring2.rotation.z -= dt * 3.5;
-    ring.position.z = 0.6 + Math.sin(t * 2) * 0.3;
 
     // core breathes; brighter under thrust
     const pulse = 0.5 + 0.5 * Math.sin(t * 4);

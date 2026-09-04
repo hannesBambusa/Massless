@@ -18,6 +18,7 @@ export const SHIP = {
   slowRadius: 40,      // start slowing this far from a point
   approachGap: 12,     // approach stops this far outside an object's radius
   orbitLead: 0.55,     // radians ahead on the orbit circle the ship aims for
+  orbitSpin: 1.2,      // rad/s corkscrew roll about the centreline while orbiting
   ranges: [15, 30, 60, 120],   // orbit / keep-at-range choices
   defaultRange: 30,
   hull: 100, shield: 60, shieldRegen: 6,
