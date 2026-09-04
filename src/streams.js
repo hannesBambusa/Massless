@@ -77,6 +77,7 @@ export class Streams {
     return { strandPts, sparks, spos, sg };
   }
 
+  dispose() { this.group.parent && this.group.parent.remove(this.group); if (this.tethers) this.tethers.parent && this.tethers.parent.remove(this.tethers); this.list = []; if (this.items) this.items = []; }
   update(dt) {
     for (const it of this.items) {
       for (let i = 0; i < it.sparks.length; i++) {

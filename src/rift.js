@@ -67,6 +67,7 @@ export class Rifts {
     this.group.add(g);
     return g;
   }
+  dispose() { this.group.parent && this.group.parent.remove(this.group); if (this.tethers) this.tethers.parent && this.tethers.parent.remove(this.tethers); this.list = []; if (this.items) this.items = []; }
   update(dt) {
     for (let idx = this.list.length - 1; idx >= 0; idx--) {
       const g = this.list[idx];

@@ -1,7 +1,7 @@
 // The player's ship: procedural neon dart, EVE-style command autopilot, direct-flight input, shield and hull.
 // Forward is -Z in local space (three.js convention). The ship keeps world Y as up in every mode.
 import * as THREE from 'three';
-import { COLORS, SHIP, WARP } from './config.js';
+import { COLORS, SHIP, WARP, JUMP } from './config.js';
 import { WarpFx } from './warpfx.js';
 import { Trail } from './trail.js';
 import { byId } from './ships/index.js';
@@ -26,6 +26,7 @@ export class Ship {
     this.range = SHIP.defaultRange;
     this.thrustLevel = 0; this.bank = 0; this.yawRate = 0; this.bendW = 0; this.spin = 0; this.spinRate = 0;
     this.warpW = 0; this.warpV = 0;   // visual warp weight and current warp speed
+    this.jumpW = 0;                    // interstellar fold weight, 0..1, peaks mid-fold
     this.trail = new Trail();
     this._inv = new THREE.Matrix4(); this._invQ = new THREE.Quaternion();
     this.warpFx = new WarpFx(this.group);
@@ -57,14 +58,23 @@ export class Ship {
   approach(obj, gap) { this.cmd = { kind: 'approach', obj, gap }; }   // gap: stop this far outside the object (default SHIP.approachGap)
   orbit(obj, range = this.range) { this.cmd = { kind: 'orbit', obj, range }; }
   keepAtRange(obj, range = this.range) { this.cmd = { kind: 'keep', obj, range }; }
-  stop() { if (this.cmd.kind === 'warp' && this.cmd.phase !== 'align') return; this.cmd = { kind: 'stop' }; }   // no stopping mid-warp
+  stop() { if ((this.cmd.kind === 'warp' || this.cmd.kind === 'jump') && this.cmd.phase !== 'align') return; this.cmd = { kind: 'stop' }; }   // no stopping mid-warp or mid-jump
   /** warp: align first (nose on target, 75% speed), then the warp phases run outside normal physics */
   warpTo(obj) {
     if (obj.position.distanceTo(this.group.position) < WARP.minDist) return false;
     this.cmd = { kind: 'warp', obj, phase: 'align', t: 0 };
     return true;
   }
-  get warping() { return this.cmd.kind === 'warp' && this.cmd.phase !== 'align'; }
+  get warping() { return (this.cmd.kind === 'warp' || this.cmd.kind === 'jump') && this.cmd.phase !== 'align'; }
+  /** jump to another system: align on a direction, then charge / fold / arrive. onSwap() is called mid-fold to swap the world. */
+  /** onSwap must return the new home position (the run-in ends just short of it) */
+  jumpTo(system, onSwap) {
+    const dir = new THREE.Vector3(1, 0, -0.4).normalize();
+    const c = { kind: 'jump', system, phase: 'align', t: 0, dir, swapped: false };
+    c.onSwap = () => { c.home = onSwap().clone(); };
+    this.cmd = c;
+    return true;
+  }
   /** direct mode: input is a world-space vector, length 0..1 */
   direct(input) { if (this.cmd.kind !== 'direct') this.cmd = { kind: 'direct', input: new THREE.Vector3() }; this.cmd.input.copy(input); }
   /** the point the ship is steering for, if any (for the marker) */
@@ -72,8 +82,19 @@ export class Ship {
   get target() { return this.cmd.obj || null; }
   describe() {
     const c = this.cmd, n = c.obj ? c.obj.name : '';
-    return { stop: 'Stopped', goto: 'Flying to point', direction: 'Flying', approach: `Approaching ${n}`, orbit: `Orbiting ${n} at ${c.range}`, keep: `Keeping ${n} at ${c.range}`, direct: 'Manual', warp: c.phase === 'align' ? `Aligning to ${n}` : `Warping to ${n}` }[c.kind];
+    switch (c.kind) {
+      case 'goto': return 'Flying to point';
+      case 'direction': return 'Flying';
+      case 'approach': return `Approaching ${n}`;
+      case 'orbit': return `Orbiting ${n} at ${c.range}`;
+      case 'keep': return `Keeping ${n} at ${c.range}`;
+      case 'direct': return 'Manual';
+      case 'warp': return c.phase === 'align' ? `Aligning to ${n}` : `Warping to ${n}`;
+      case 'jump': return c.phase === 'align' ? `Aligning for the fold to ${c.system.name}` : c.phase === 'charge' ? 'Charging the fold' : c.phase === 'fold' ? `Folding to ${c.system.name}` : `Arriving at ${c.system.name}`;
+      default: return 'Stopped';
+    }
   }
+
 
   /** wanted velocity for the current command, written into out; returns out */
   wanted(out) {
@@ -81,6 +102,7 @@ export class Ship {
     out.set(0, 0, 0);
     if (c.kind === 'direction') return out.copy(c.dir).multiplyScalar(max);
     if (c.kind === 'warp') return c.phase === 'align' ? out.copy(c.obj.position).sub(p).normalize().multiplyScalar(SHIP.maxSpeed) : out;
+    if (c.kind === 'jump') return c.phase === 'align' ? out.copy(c.dir).multiplyScalar(SHIP.maxSpeed) : out;
     if (c.kind === 'direct') return out.copy(c.input).multiplyScalar(max);
     if (c.kind === 'goto' || c.kind === 'approach' || c.kind === 'keep') {
       let goal = c.point, stopAt = SHIP.arrive;
@@ -119,8 +141,48 @@ export class Ship {
   }
 
   /** warp phases: accel -> cruise -> brake -> exit. Position is driven directly; returns true while it owns the ship */
+  /** interstellar jump phases. Position runs along a straight line at rising speed; the fold weight drives the visuals. */
+  updateJump(dt) {
+    const c = this.cmd, g = this.group;
+    this.yawRate = 0;
+    if (c.phase === 'align') {
+      this.forward(_fwd);
+      const aligned = _fwd.angleTo(c.dir) < WARP.alignAngle && this.speed >= SHIP.maxSpeed * WARP.alignSpeed * this.throttle;
+      if (aligned || (c.t += dt) > 8) { c.phase = 'charge'; c.t = 0; this.warpV = this.speed; }
+      return false;
+    }
+    c.t += dt;
+    let f = 0;   // fold weight
+    if (c.phase === 'charge') { f = c.t / JUMP.charge * 0.6; this.warpV += (WARP.speed - this.warpV) * damp(1.6, dt); if (c.t >= JUMP.charge) { c.phase = 'fold'; c.t = 0; } }
+    else if (c.phase === 'fold') {
+      f = 0.6 + 0.4 * Math.sin(Math.min(1, c.t / JUMP.fold) * Math.PI);
+      this.warpV += (JUMP.speed - this.warpV) * damp(2.5, dt);
+      if (!c.swapped && c.t >= JUMP.fold * 0.5) { c.swapped = true; c.onSwap && c.onSwap(); c.postT = 0; c.postTotal = JUMP.fold * 0.5 + JUMP.arrive; c.postD = JUMP.dropDist; }
+      if (c.t >= JUMP.fold) { c.phase = 'arrive'; c.t = 0; }
+    } else if (c.phase === 'arrive') {
+      f = 0.6 * (1 - c.t / JUMP.arrive);
+      if (c.t >= JUMP.arrive) { this.cmd = { kind: 'stop' }; this.vel.copy(c.dir).multiplyScalar(SHIP.maxSpeed * WARP.exitSpeed); this.speed = this.vel.length(); this.jumpW = 0; return true; }
+    }
+    if (c.swapped) {
+      // after the swap the ship is on a fixed run-in: it decelerates along its line to stop just short of the home site
+      c.postT += dt;
+      const u = Math.min(1, c.postT / c.postTotal), rem = c.postD * (1 - u) * (1 - u);
+      g.position.copy(c.home).addScaledVector(c.dir, -(JUMP.dropGap + rem));
+      this.warpV = Math.max(SHIP.maxSpeed * WARP.exitSpeed, 2 * c.postD * (1 - u) / c.postTotal);
+    } else {
+      g.position.addScaledVector(c.dir, Math.min(this.warpV, WARP.speed) * dt);
+    }
+    this.vel.copy(c.dir).multiplyScalar(this.warpV); this.speed = this.warpV;
+    _m.lookAt(g.position, _r.copy(g.position).add(c.dir), UP); _q.setFromRotationMatrix(_m); g.quaternion.slerp(_q, damp(6, dt));
+    this.jumpW += (clamp(f, 0, 1) - this.jumpW) * damp(4, dt);
+    this.warpW += (clamp(this.warpV / WARP.speed * 1.4, 0, 1) - this.warpW) * damp(2.5, dt);
+    return true;
+  }
+
   updateWarp(dt) {
     const c = this.cmd, g = this.group;
+    if (c.kind === 'jump') return this.updateJump(dt);
+    this.jumpW += (0 - this.jumpW) * damp(3, dt);
     if (c.kind !== 'warp') { this.warpW += (0 - this.warpW) * damp(3, dt); return false; }
     _dir.copy(c.obj.position).sub(g.position); const dist = _dir.length(); _dir.normalize();
     const stopAt = c.obj.radius + WARP.stopAt;
@@ -202,14 +264,15 @@ export class Ship {
     // snake: the body is laid along the path the nose has travelled. Roll (bank + corkscrew) happens about that centreline,
     // so the body carries no rotation of its own.
     const ws = this.warpW;   // warp: stretch the vessel along its axis (the trail lay-out reads this scale)
-    this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 + ws * WARP.stretch));
+    const js = this.jumpW;
+    this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35 - js * 0.3), SHIP.scale * (1 - ws * 0.35 - js * 0.3), SHIP.scale * (1 + ws * WARP.stretch + js * JUMP.stretch));
     this.trail.push(g.position, this.forward(_fwd));
     this.body.rotation.set(0, 0, 0);
     g.updateMatrixWorld(true);
     this._inv.copy(this.body.matrixWorld).invert();                   // world -> body local (model group sits at the body origin, only scaled)
     this._invQ.setFromRotationMatrix(this._inv).normalize();
     this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
-    this.warpFx.update(dt, this.warpW, this.warpV);
+    this.warpFx.update(dt, this.warpW, this.warpV, this.jumpW);
     // distance fade: the glow sprites have a fixed world size, so from far away they bloom into a single blob. Scale their
     // opacity by camera distance. Designs set opacities in their own update; we remember what we applied to tell a fresh value apart.
     const fade = clamp(SHIP.glowNear / Math.max(1, this.camDist || 0), SHIP.glowMin, 1) * (1 - this.warpW * 0.3);

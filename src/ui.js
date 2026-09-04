@@ -4,6 +4,7 @@ import { fmt, fmtDist } from './utils.js';
 import { SHIP, WORLD, ENERGY_BY_KEY, ROCK } from './config.js';
 import { DESIGNS } from './ships/index.js';
 import { HudFx, setHudDt } from './hudfx.js';
+import { SYSTEMS, lyBetween } from './systems.js';
 import { ResizablePanel } from './panel.js';
 import { Settings } from './settings.js';
 
@@ -14,6 +15,7 @@ const el = {
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
   design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), auto: $('btn-auto'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
+  jump: $('btn-jump'), sysList: $('system-list'),
   warp: $('warp-readout'), warpSpeed: $('warp-speed'), warpLeft: $('warp-left'),
   yield: $('yield-num'), yieldMax: $('yield-max'), yieldKind: $('yield-kind'), holdList: $('hold-list'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
@@ -38,6 +40,15 @@ export class UI {
     el.design.value = game.ship.design;
     el.design.addEventListener('change', () => { game.ship.setDesign(el.design.value); el.design.blur(); });
     el.mode.addEventListener('click', () => game.toggleMode());
+    // systems: one row each, click picks the jump target
+    this.sysRows = new Map();
+    for (const sys of SYSTEMS) {
+      const row = document.createElement('div'); row.className = 'ov-row system'; row.dataset.id = sys.id;
+      row.innerHTML = `<span class="ov-node"></span><span class="ov-name">${sys.name}</span><span class="ov-dist"></span><span class="ov-bar"></span>`;
+      row.addEventListener('mousedown', (e) => { if (e.button !== 0) return; if (sys.id === game.system.id) return; game.jumpTarget = sys; });
+      row.addEventListener('dblclick', () => { game.jumpTarget = sys; game.command('jump'); });
+      el.sysList.appendChild(row); this.sysRows.set(sys.id, row);
+    }
     for (const b of document.querySelectorAll('#hud-modes button')) b.addEventListener('click', () => this.lockHud(b.dataset.hud));
     this.setHud('nav', true);
     window.addEventListener('keydown', (e) => {
@@ -150,9 +161,22 @@ export class UI {
     // auto harvest offer: only when a condensate is within reach
     const nearCloud = rocks.list.some((c) => c.position.distanceTo(p) - c.radius < ROCK.autoShow);
     el.auto.hidden = !(nearCloud || this.game.auto) || ship.warping;
+    // systems rows: distance in light-years, current marked, jump target lit; the jump offer shows when a target is picked
+    for (const [id, row] of this.sysRows) {
+      const sys = SYSTEMS.find((x) => x.id === id), here = this.game.system.id === id;
+      row.classList.toggle('here', here); row.classList.toggle('on', this.game.jumpTarget === sys);
+      row.children[2].textContent = here ? 'here' : lyBetween(this.game.system, sys).toFixed(1) + ' ly';
+    }
+    el.jump.hidden = !this.game.jumpTarget || ship.warping;
+    if (this.game.jumpTarget) el.jump.querySelector('.al').textContent = `Fold to ${this.game.jumpTarget.name}`;
     // warp readout above the command core: speed in AU/s and distance left, steady numbers
     el.warp.hidden = !ship.warping;
-    if (ship.warping) { el.warpSpeed.textContent = (ship.speed / WORLD.auUnits).toFixed(2); el.warpLeft.textContent = ((ship.cmd.obj.position.distanceTo(p)) / WORLD.auUnits).toFixed(1); }
+    if (ship.warping) {
+      el.warpSpeed.textContent = (ship.speed / WORLD.auUnits).toFixed(ship.cmd.kind === 'jump' ? 0 : 2);
+      el.warpLeft.textContent = ship.cmd.kind === 'jump' ? (ship.cmd.phase === 'fold' ? Math.round(100 * Math.min(1, ship.cmd.t / 4)) + '%' : ship.cmd.phase) : ((ship.cmd.obj.position.distanceTo(p)) / WORLD.auUnits).toFixed(1);
+      el.warp.classList.toggle('jump', ship.cmd.kind === 'jump');
+      document.getElementById('warp-left-unit').textContent = ship.cmd.kind === 'jump' ? 'fold' : 'AU left';
+    }
     if (this.hud === 'combat') { const foe = sel && sel.kind === 'mob' ? sel : threat; el.threat.textContent = foe ? `${foe.name} · ${Math.round(foe.hp)} / ${foe.hpMax}` : 'No hostile locked'; el.threatDist.textContent = foe ? fmtDist(foe.position.distanceTo(p), WORLD.auUnits) : ''; el.shieldNum.textContent = Math.round(ship.shield) + ' / ' + ship.shieldMax; }
 
     // overview: refresh a few times a second, rows keyed by object

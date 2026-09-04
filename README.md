@@ -55,6 +55,10 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 
 One HUD with three states it morphs between: **Nav** (teal, movement commands forward), **Harvest** (gold, lance and orbit forward, the gauge reads the rock's remaining yield) and **Combat** (red, lance, keep range and track forward, outer ring pulses). The HUD follows what you are dealing with: select a condensate and it unfolds into Harvest with a yield readout; select a wisp, or get hunted by one, and it snaps into Combat with a threat readout and a scanline. Keys 1 / 2 / 3 or the chips force a state for six seconds. States are CSS on `body[data-hud]` in `style.css`.
 
+## Systems
+
+Three star systems (`src/systems.js`), each with its own sites, star colour and sky. Only the current one is loaded; the overview lists the others with distances in light-years. Click one and press J (or the Fold offer): the ship aligns, charges, and folds. The tunnel turns violet-white and stretches, the camera pushes in and shakes, the screen bleaches at the peak, and the world is swapped underneath. You drop in beside the new system's home site.
+
 ## Energy
 
 Condensates come in kinds, each a colour and a name: Glacis (ice), Sol (gold), Cerule (blue), Ember (amber) and the rare Lumen (white). Wisps leave Ash. Unbinding one releases motes of that energy which fly to the ship; the Hold panel bottom-left counts what you carry by kind. Defined in `ENERGY` in `src/config.js`.

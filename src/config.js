@@ -74,6 +74,17 @@ export const CAMERA = {
   fov: 60,
 };
 
+export const JUMP = {             // interstellar jump between systems
+  charge: 2.2,         // s: after align, the vessel winds up and the tunnel forms
+  fold: 4.0,           // s: through the fold, the system swaps half-way
+  arrive: 1.8,         // s: drop-in and slow down at the new home site
+  speed: 60000,        // displayed speed during the fold (units/s), for the readout
+  fov: -14,            // the view narrows through the fold (negative = tighter)
+  stretch: 1.2,        // vessel stretch at the peak: a drift, not a dash
+  dropDist: 60000,     // run-in distance after the swap, flown on a decelerating curve
+  dropGap: 90,         // the ship stops this far short of the new home site
+};
+
 export const LANCE = {
   range: 120,          // m from the target's surface
   harvestGap: 60,      // siphon auto-close keeps this range from the cloud's surface

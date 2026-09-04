@@ -4,7 +4,7 @@ import { COLORS } from './config.js';
 import { glowSprite, faintEdgeMat } from './materials.js';
 import { TAU, rnd } from './utils.js';
 
-export const SITES = [
+export const SITES_UNUSED = [
   // type: harvest sites grow condensates on their streams; combat sites are torn open by a rift that wisps pour out of
   { name: 'Ash Reach', pos: [0, 0, 0], color: COLORS.cyan, type: 'harvest' },
   { name: 'Cinder Belt', pos: [12600, 360, -5400], color: COLORS.amber, type: 'harvest' },
@@ -19,16 +19,19 @@ const NEW_NAMES = ['Kessel Scar', 'Vantage Tear', 'Hollow Brand', 'Umber Rift', 
 const NEW_COLORS = [COLORS.magenta, COLORS.red, COLORS.violet, COLORS.amber];
 
 export class Sites {
-  constructor(scene) {
+  constructor(scene, defs) {
+    this.scene = scene;
     this.group = new THREE.Group();
-    this.list = SITES.map((s) => this.build(s));
+    this.list = defs.map((s) => this.build(s));
     scene.add(this.group);
   }
+  dispose() { this.scene.remove(this.group); }
+  get home() { return this.list.find((s) => s.home) || this.list[0]; }
 
   build(def) {
     const g = new THREE.Group();
     g.position.set(...def.pos);
-    g.name = def.name; g.kind = 'site'; g.radius = 18; g.type = def.type;
+    g.name = def.name; g.kind = 'site'; g.radius = 18; g.type = def.type; g.home = !!def.home;
     // beacon: a long glint visible from across the system (no fog), plus a local structure of rings
     // the far glint lives at scene level and is re-projected each frame, so it shows from any distance regardless of the camera's far plane
     const far = glowSprite(def.color, 60, 0.9); far.material.fog = false; this.group.add(far);

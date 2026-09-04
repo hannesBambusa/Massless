@@ -83,6 +83,7 @@ export class Asteroids {
   }
 
   /** onDeath(rock) is called once when a rock reaches 0 hp; the rock is removed here */
+  dispose() { this.group.parent && this.group.parent.remove(this.group); if (this.tethers) this.tethers.parent && this.tethers.parent.remove(this.tethers); this.list = []; if (this.items) this.items = []; }
   update(dt, onDeath) {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i];

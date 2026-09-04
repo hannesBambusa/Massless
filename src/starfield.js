@@ -39,6 +39,9 @@ export class Starfield {
     scene.add(this.group);
   }
 
+  /** recolour the sky for a system: nebula sprites take the system's nebula colour, one of them the star colour */
+  setNebula(nebula, star) { this.nebulas.forEach((n, i) => n.material.color.set(i === 3 ? star : nebula)); }
+
   /** shells sit on the camera, offset a little toward the ship by their parallax so near stars slide past far ones; the offset is capped so a far zoom never shows a shell as a ball */
   update(cameraPos, shipPos) {
     for (const l of this.layers) {

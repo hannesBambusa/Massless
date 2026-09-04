@@ -443,3 +443,26 @@ body[data-hud="harvest"] { --hud-rate: 1.4; }
 
 .ov-row.site .ov-name { font-size: 10px; display: flex; align-items: baseline; gap: 6px; overflow: visible; }
 .ov-row.site .ov-name::after { margin-left: 0; flex: none; font-size: 9px; }
+
+/* ---------- systems in the overview, the fold offer, and the fold bleach ---------- */
+.ov-head.sys { border-top: 1px solid var(--cyan-s); margin-top: 6px; }
+#system-list { padding: 4px 0 6px; }
+.ov-row.system .ov-node::before { width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid var(--lav); box-shadow: 0 0 8px var(--lav-d); }
+.ov-row.system .ov-name { font-family: var(--font-head); font-size: 11px; letter-spacing: 1px; color: var(--lav); }
+.ov-row.system.here .ov-node::before { background: var(--lav); }
+.ov-row.system.here .ov-name { color: var(--text); }
+.ov-row.system.here .ov-dist { color: var(--lav); font-family: var(--font-head); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
+.ov-row.system .ov-bar { background-image: repeating-linear-gradient(90deg, var(--lav) 0 6px, transparent 6px 8px); }
+.ov-row.system.on .ov-node::before { background: #fff; border-color: #fff; box-shadow: 0 0 12px var(--lav); }
+#btn-jump { position: fixed; left: 50%; bottom: 178px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 10px; border: none; border-radius: 16px; background: rgba(5,10,28,0.9); color: var(--lav); cursor: pointer; }
+#btn-jump[hidden] { display: none; }
+#btn-jump::before { content: ''; position: absolute; inset: 0; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--lav) 70%, transparent); box-shadow: 0 0 12px var(--lav-s); }
+#btn-jump svg { width: 18px; height: 18px; filter: drop-shadow(0 0 4px var(--lav)); }
+#btn-jump .al { font-family: var(--font-head); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 8px var(--lav-d); }
+#btn-jump .ak { font-family: var(--font-head); font-size: 8px; color: var(--muted); }
+#btn-jump:hover { background: rgba(10,18,44,0.95); box-shadow: none; }
+#btn-jump:hover::before { border-color: var(--lav); }
+#fold { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 50%, #fff 0%, #e6dcff 30%, rgba(159,140,255,0.6) 60%, rgba(40,20,80,0.2) 100%); }
+#warp-readout.jump { color: var(--lav); }
+#warp-readout.jump::before { border-color: var(--lav); box-shadow: 0 0 14px var(--lav-s); }
+#warp-readout.jump #warp-speed, #warp-readout.jump #warp-left { text-shadow: 0 0 8px var(--lav); }

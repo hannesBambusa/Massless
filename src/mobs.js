@@ -41,6 +41,7 @@ export class Mobs {
     return g;
   }
 
+  dispose() { this.group.parent && this.group.parent.remove(this.group); if (this.tethers) this.tethers.parent && this.tethers.parent.remove(this.tethers); this.list = []; if (this.items) this.items = []; }
   update(dt, ship, onDeath) {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i]; m.t += dt;
