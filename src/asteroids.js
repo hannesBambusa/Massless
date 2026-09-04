@@ -16,17 +16,20 @@ function rockGeometry(r) {
 }
 
 export class Asteroids {
-  constructor(scene) {
+  /** centres: positions to scatter a cluster around (one per site) */
+  constructor(scene, centres = [new THREE.Vector3()]) {
     this.group = new THREE.Group();
     this.list = [];
-    const half = WORLD.size / 2, tints = [COLORS.ice, COLORS.gold, COLORS.sky, COLORS.amber, COLORS.white];
-    for (let i = 0; i < WORLD.asteroids; i++) {
+    const half = WORLD.clusterRadius, tints = [COLORS.ice, COLORS.gold, COLORS.sky, COLORS.amber, COLORS.white];
+    let i = 0;
+    for (const centre of centres) for (let n = 0; n < WORLD.asteroids; n++, i++) {
       const r = rnd(2, 14), geo = rockGeometry(r);
       const m = new THREE.Group();
       m.add(new THREE.Mesh(geo, hullMat(0x06102a)));
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 12), faintEdgeMat(pick(tints), rnd(0.35, 0.8))));
       m.position.set(rnd(-half, half), rnd(-half * 0.4, half * 0.4), rnd(-half, half));
-      if (m.position.length() < 40) m.position.setLength(60);   // keep the spawn clear
+      if (m.position.length() < 60) m.position.setLength(80);   // keep the site beacon clear
+      m.position.add(centre);
       m.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6));
       m.spin = new THREE.Vector3(rnd(-0.2, 0.2), rnd(-0.2, 0.2), rnd(-0.2, 0.2));
       m.radius = r;

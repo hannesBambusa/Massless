@@ -77,3 +77,9 @@ body.direct #cmd { display: none; }
 #target-label.off #tl-arrow { display: inline-block; }
 #tl-dist { color: var(--text); font-family: var(--font-body); font-size: 13px; }
 #btn-track { flex: 0.8; }
+
+.cmd-buttons button.warp { color: var(--gold); border-color: rgba(255,209,102,0.5); }
+.ov-row.site .ov-name { color: var(--gold); font-family: var(--font-head); font-size: 11px; letter-spacing: 1px; }
+.ov-row.site + .ov-row:not(.site) { border-top: 1px solid var(--line); }
+#flash { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); padding: 8px 16px; background: var(--panel); border: 1px solid rgba(255,77,109,0.5); color: var(--red); border-radius: 6px; font-family: var(--font-head); font-size: 12px; letter-spacing: 1px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 6; }
+#flash.on { opacity: 1; }

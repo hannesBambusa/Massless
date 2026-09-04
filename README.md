@@ -30,7 +30,9 @@ Then open http://localhost:8766/
 | `src/ui.js` | HUD, command bar, throttle, overview list |
 | `src/marker.js` | destination marker |
 | `src/starfield.js` | parallax star shells and nebulas |
-| `src/asteroids.js` | scattered rocks |
+| `src/sites.js` | named sites across the system: beacons you can warp between, each with a rock cluster |
+| `src/warpfx.js` | warp tunnel streaks |
+| `src/asteroids.js` | rock clusters around each site |
 | `src/streams.js` | helical energy streams with lattices and flowing sparks |
 | `src/input.js` | keyboard state |
 | `src/config.js` | palette and tuning |
@@ -48,7 +50,7 @@ Every design exports `id`, `name`, `description` and `build()`, which returns `{
 
 Two flight modes, V or the top-right button switches.
 
-**Command mode (default, EVE style).** Click an object or an overview row to select it (right-click selects and carries the running orbit / approach / keep-range over to the new target), then Approach (Q), Orbit (W) or Keep at range (E) at the chosen range. Double-click empty space to fly that way. Space stops. Track (C) swings the camera so the target stays in view, any drag releases it. The target's name and distance follow it on screen, pinned to the edge with an arrow when it is out of view. Throttle slider caps speed. Drag orbits the camera, wheel zooms.
+**Command mode (default, EVE style).** Click an object or an overview row to select it (right-click selects and carries the running orbit / approach / keep-range over to the new target), then Approach (Q), Orbit (W) or Keep at range (E) at the chosen range. Double-click empty space to fly that way. Distances beyond 1 km show in AU (`WORLD.auUnits` world units per AU). Warp (S) to a selected site or anything over 150 m away: the camera swings in behind the ship to look down the warp line, the ship aligns to 75% speed, stretches into warp, streaks across the system and drops out beside the target. Space stops (not mid-warp). Track (C) swings the camera so the target stays in view, any drag releases it. The target's name and distance follow it on screen, pinned to the edge with an arrow when it is out of view. Throttle slider caps speed. Drag orbits the camera, wheel zooms.
 
 **Direct mode.** Chase camera. W/S thrust, A/D strafe, R/F up and down. The ship stays level. Space stops.
 

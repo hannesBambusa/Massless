@@ -5,11 +5,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { COLORS, CAMERA, BLOOM, DIRECT } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
 import { Streams } from './streams.js';
+import { Sites } from './sites.js';
 import { Marker } from './marker.js';
 import { Selection } from './selection.js';
 import { UI } from './ui.js';
@@ -29,7 +30,8 @@ const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight,
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BLOOM.strength, BLOOM.radius, BLOOM.threshold));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // lighting for the lit ship hull; the rest of the scene uses unlit materials and ignores it. Metal needs something to reflect, so a neutral room env map.
@@ -41,9 +43,10 @@ const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(-40, 60,
 const rim = new THREE.DirectionalLight(0x4ff2ff, 1.2); rim.position.set(30, -10, -50); scene.add(rim);
 
 
+const sites = new Sites(scene);
 const game = {
-  scene, camera, state: { scrap: 0 }, direct: false,
-  ship: new Ship(scene), stars: new Starfield(scene), rocks: new Asteroids(scene), streams: new Streams(scene), marker: new Marker(scene),
+  scene, camera, state: { scrap: 0 }, direct: false, sites,
+  ship: new Ship(scene), stars: new Starfield(scene), rocks: new Asteroids(scene, sites.list.map((x) => x.position)), streams: new Streams(scene), marker: new Marker(scene),
 };
 game.selection = new Selection(scene, camera);
 const { ship, rocks, selection, marker, stars, streams } = game;
@@ -56,6 +59,7 @@ game.command = (name) => {
   if (name === 'approach') ship.approach(t);
   if (name === 'orbit') ship.orbit(t);
   if (name === 'keep') ship.keepAtRange(t);
+  if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
 };
 /** select obj; if the ship is busy with a target command, re-issue it against the new target */
 game.retarget = (obj) => {
@@ -63,12 +67,14 @@ game.retarget = (obj) => {
   selection.set(obj);
   const k = ship.cmd.kind;
   if (k === 'orbit' || k === 'approach' || k === 'keep') game.command(k);
+  if (k === 'warp' && ship.cmd.phase === 'align') game.command('warp');
 };
 game.toggleMode = () => {
   game.direct = !game.direct;
   ship.stop();
   ui.setMode(game.direct);
 };
+ship.position.set(0, 0, 160);   // start a little off the home beacon
 const ui = new UI(game);
 ui.setMode(false);
 
@@ -78,7 +84,11 @@ const dir = new THREE.Vector3();
 function pickRock(ndc) {
   ray.setFromCamera(new THREE.Vector2(...ndc), camera);
   const hits = ray.intersectObjects(rocks.group.children, true);
-  return hits.length ? hits[0].object.parent : null;
+  if (hits.length) return hits[0].object.parent;
+  // sites: pick by screen distance to the beacon, since they are sprites far away
+  let best = null, bd = 0.05;
+  for (const st of sites.list) { const v = st.position.clone().project(camera); if (v.z > 1) continue; const d = Math.hypot(v.x - ndc[0], (v.y - ndc[1]) / camera.aspect); if (d < bd) { bd = d; best = st; } }
+  return best;
 }
 let zoom = 1, camYaw = 0, camPitch = CAMERA.pitch0;
 game.tracking = false;
@@ -111,6 +121,7 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyQ') game.command('approach');
     if (e.code === 'KeyW') game.command('orbit');
     if (e.code === 'KeyE') game.command('keep');
+    if (e.code === 'KeyS') game.command('warp');
   }
 });
 
@@ -129,7 +140,7 @@ function updateDirect() {
 const pivot = new THREE.Vector3(), camTarget = new THREE.Vector3(), tmp = new THREE.Vector3();
 camera.position.set(0, 10, 30);
 function updateCamera(dt) {
-  pivot.lerp(ship.position, damp(CAMERA.lerp, dt));
+  pivot.lerp(ship.position, damp(CAMERA.lerp + ship.warpW * 80, dt));   // at warp speed the pivot must stay glued to the ship
   if (game.direct) {
     const c = CAMERA.chase; ship.forward(tmp); tmp.y = 0; tmp.normalize();
     camTarget.copy(ship.position).addScaledVector(tmp, -c.back * zoom); camTarget.y += c.up * zoom;
@@ -138,8 +149,15 @@ function updateCamera(dt) {
     return;
   }
   const d = CAMERA.dist * zoom;
+  // warp: swing in behind the ship and look down the line it will travel; animated over the align phase
+  if (ship.cmd.kind === 'warp') {
+    ship.forward(tmp);
+    const wantYaw = Math.atan2(-tmp.x, -tmp.z);
+    let dy = wantYaw - camYaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    camYaw += dy * damp(CAMERA.warpLerp, dt);
+    camPitch += (CAMERA.warpPitch - camPitch) * damp(CAMERA.warpLerp, dt);
+  } else if (game.tracking && selection.obj) {
   // tracking: swing the orbit so the camera sits on the far side of the ship from the target and looks across at it
-  if (game.tracking && selection.obj) {
     tmp.copy(selection.obj.position).sub(pivot);
     const wantYaw = Math.atan2(-tmp.x, -tmp.z);
     let dy = wantYaw - camYaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -149,6 +167,13 @@ function updateCamera(dt) {
   }
   camera.position.set(Math.sin(camYaw) * Math.cos(camPitch) * d, Math.sin(camPitch) * d, Math.cos(camYaw) * Math.cos(camPitch) * d).add(pivot);
   camera.up.set(0, 1, 0); camera.lookAt(pivot);
+}
+
+function updateWarpLook() {
+  const w = ship.warpW;
+  const fov = CAMERA.fov + WARP.fov * w;
+  if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  bloomPass.strength = BLOOM.strength + w * 0.5;
 }
 
 window.addEventListener('resize', () => {
@@ -163,6 +188,8 @@ function frame(now) {
   ship.update(dt);
   rocks.update(dt);
   streams.update(dt);
+  sites.update(dt, camera.position);
+  updateWarpLook();
   selection.update(dt);
   marker.update(dt, ship.destination, ship.position.y);
   marker.updateOrbit(ship.cmd);

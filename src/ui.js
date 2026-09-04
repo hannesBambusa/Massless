@@ -1,6 +1,6 @@
 // HTML overlay: HUD numbers, command bar, throttle, overview list, mode toggle. Reads game state, writes DOM, fires callbacks.
 import * as THREE from 'three';
-import { fmt, clamp } from './utils.js';
+import { fmt, fmtDist } from './utils.js';
 import { SHIP, WORLD } from './config.js';
 import { DESIGNS } from './ships/index.js';
 
@@ -9,7 +9,7 @@ const el = {
   speed: $('hud-speed'), pos: $('hud-pos'), scrap: $('hud-scrap'), shield: $('bar-shield'), hull: $('bar-hull'), help: $('help'),
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
-  design: $('sel-design'), track: $('btn-track'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
 };
 
 export class UI {
@@ -33,6 +33,7 @@ export class UI {
     el.track.addEventListener('click', () => game.toggleTrack());
     this.proj = new THREE.Vector3();
   }
+  flash(msg) { el.flash.textContent = msg; el.flash.classList.add('on'); clearTimeout(this.flashT); this.flashT = setTimeout(() => el.flash.classList.remove('on'), 2200); }
   setTracking(on) { el.track.classList.toggle('on', on); }
   syncRanges() { for (const b of el.ranges.children) b.classList.toggle('on', +b.dataset.range === this.game.ship.range); }
   setMode(direct) {
@@ -61,7 +62,7 @@ export class UI {
     el.label.classList.toggle('off', off);
     el.label.style.left = x + 'px'; el.label.style.top = (y - (off ? 0 : 28)) + 'px';
     el.labelName.textContent = obj.name;
-    el.labelDist.textContent = Math.round(obj.position.distanceTo(this.game.ship.position) - obj.radius) + ' m';
+    el.labelDist.textContent = fmtDist(obj.position.distanceTo(this.game.ship.position) - obj.radius, WORLD.auUnits);
   }
 
   update(dt) {
@@ -76,26 +77,27 @@ export class UI {
 
     const sel = selection.obj;
     el.cmd.classList.toggle('has-target', !!sel);
-    if (sel) { el.cmdTitle.textContent = sel.name; el.cmdDist.textContent = Math.round(sel.position.distanceTo(p) - sel.radius) + ' m'; }
+    if (sel) { el.cmdTitle.textContent = sel.name; el.cmdDist.textContent = fmtDist(sel.position.distanceTo(p) - sel.radius, WORLD.auUnits); }
     else { el.cmdTitle.textContent = 'No target'; el.cmdDist.textContent = ''; }
 
     // overview: refresh a few times a second, rows keyed by object
     this.overviewTimer -= dt;
     if (this.overviewTimer > 0) return;
     this.overviewTimer = 0.25;
-    const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 14);
+    const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 10);
+    const far = this.game.sites.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).sort((a, b) => a[1] - b[1]);
     const keep = new Set();
-    for (const [o, d] of near) {
+    for (const [o, d] of [...far, ...near]) {
       let row = this.rows.get(o);
       if (!row) {
-        row = document.createElement('div'); row.className = 'ov-row';
+        row = document.createElement('div'); row.className = 'ov-row' + (o.kind === 'site' ? ' site' : '');
         row.innerHTML = `<span class="ov-name"></span><span class="ov-dist"></span>`;
         row.addEventListener('click', () => selection.set(o));
         row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
         row.addEventListener('dblclick', () => { selection.set(o); this.game.command('approach'); });
         this.rows.set(o, row);
       }
-      row.firstChild.textContent = o.name; row.lastChild.textContent = Math.round(d) + ' m';
+      row.firstChild.textContent = o.name; row.lastChild.textContent = fmtDist(d, WORLD.auUnits);
       row.classList.toggle('on', o === sel);
       el.overview.appendChild(row); keep.add(o);
     }

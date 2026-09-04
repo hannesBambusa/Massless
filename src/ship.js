@@ -1,13 +1,14 @@
 // The player's ship: procedural neon dart, EVE-style command autopilot, direct-flight input, shield and hull.
 // Forward is -Z in local space (three.js convention). The ship keeps world Y as up in every mode.
 import * as THREE from 'three';
-import { COLORS, SHIP } from './config.js';
+import { COLORS, SHIP, WARP } from './config.js';
+import { WarpFx } from './warpfx.js';
 import { Shield } from './shield.js';
 import { byId } from './ships/index.js';
 import { clamp, damp } from './utils.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
-const _local = new THREE.Vector3();
+const _local = new THREE.Vector3(), _dir = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _r = new THREE.Vector3(), _want = new THREE.Vector3(), _fwd = new THREE.Vector3(), _tan = new THREE.Vector3();
 
 export class Ship {
@@ -26,6 +27,8 @@ export class Ship {
     this.throttle = 1;             // 0..1
     this.range = SHIP.defaultRange;
     this.thrustLevel = 0; this.bank = 0; this.yawRate = 0; this.bendW = 0; this.spin = 0; this.spinRate = 0;
+    this.warpW = 0; this.warpV = 0;   // visual warp weight and current warp speed
+    this.warpFx = new WarpFx(this.group);
     this.hull = SHIP.hull; this.hullMax = SHIP.hull;
     this.shield = SHIP.shield; this.shieldMax = SHIP.shield; this.shieldHit = 0;
     this.speed = 0;
@@ -53,7 +56,14 @@ export class Ship {
   approach(obj) { this.cmd = { kind: 'approach', obj }; }
   orbit(obj, range = this.range) { this.cmd = { kind: 'orbit', obj, range }; }
   keepAtRange(obj, range = this.range) { this.cmd = { kind: 'keep', obj, range }; }
-  stop() { this.cmd = { kind: 'stop' }; }
+  stop() { if (this.cmd.kind === 'warp' && this.cmd.phase !== 'align') return; this.cmd = { kind: 'stop' }; }   // no stopping mid-warp
+  /** warp: align first (nose on target, 75% speed), then the warp phases run outside normal physics */
+  warpTo(obj) {
+    if (obj.position.distanceTo(this.group.position) < WARP.minDist) return false;
+    this.cmd = { kind: 'warp', obj, phase: 'align', t: 0 };
+    return true;
+  }
+  get warping() { return this.cmd.kind === 'warp' && this.cmd.phase !== 'align'; }
   /** direct mode: input is a world-space vector, length 0..1 */
   direct(input) { if (this.cmd.kind !== 'direct') this.cmd = { kind: 'direct', input: new THREE.Vector3() }; this.cmd.input.copy(input); }
   /** the point the ship is steering for, if any (for the marker) */
@@ -61,7 +71,7 @@ export class Ship {
   get target() { return this.cmd.obj || null; }
   describe() {
     const c = this.cmd, n = c.obj ? c.obj.name : '';
-    return { stop: 'Stopped', goto: 'Flying to point', direction: 'Flying', approach: `Approaching ${n}`, orbit: `Orbiting ${n} at ${c.range}`, keep: `Keeping ${n} at ${c.range}`, direct: 'Manual' }[c.kind];
+    return { stop: 'Stopped', goto: 'Flying to point', direction: 'Flying', approach: `Approaching ${n}`, orbit: `Orbiting ${n} at ${c.range}`, keep: `Keeping ${n} at ${c.range}`, direct: 'Manual', warp: c.phase === 'align' ? `Aligning to ${n}` : `Warping to ${n}` }[c.kind];
   }
 
   /** wanted velocity for the current command, written into out; returns out */
@@ -69,6 +79,7 @@ export class Ship {
     const c = this.cmd, p = this.group.position, max = SHIP.maxSpeed * this.throttle;
     out.set(0, 0, 0);
     if (c.kind === 'direction') return out.copy(c.dir).multiplyScalar(max);
+    if (c.kind === 'warp') return c.phase === 'align' ? out.copy(c.obj.position).sub(p).normalize().multiplyScalar(SHIP.maxSpeed) : out;
     if (c.kind === 'direct') return out.copy(c.input).multiplyScalar(max);
     if (c.kind === 'goto' || c.kind === 'approach' || c.kind === 'keep') {
       let goal = c.point, stopAt = SHIP.arrive;
@@ -98,8 +109,41 @@ export class Ship {
     return out;
   }
 
+  /** warp phases: accel -> cruise -> brake -> exit. Position is driven directly; returns true while it owns the ship */
+  updateWarp(dt) {
+    const c = this.cmd, g = this.group;
+    if (c.kind !== 'warp') { this.warpW += (0 - this.warpW) * damp(3, dt); return false; }
+    _dir.copy(c.obj.position).sub(g.position); const dist = _dir.length(); _dir.normalize();
+    const stopAt = c.obj.radius + WARP.stopAt;
+    this.yawRate = 0;
+    if (c.phase === 'align') {
+      this.forward(_fwd);
+      const aligned = _fwd.angleTo(_dir) < WARP.alignAngle && this.speed >= SHIP.maxSpeed * WARP.alignSpeed * this.throttle;
+      if (aligned || (c.t += dt) > 8) { c.phase = 'accel'; this.warpV = this.speed; }
+      this.warpW += (0 - this.warpW) * damp(3, dt);
+      return false;
+    }
+    // speed target: full warp, or a braking ramp so the ship arrives at stopAt with exit speed
+    const remaining = Math.max(0, dist - stopAt);
+    const brakeV = remaining * WARP.brake + SHIP.maxSpeed * WARP.exitSpeed;
+    const wantV = Math.min(WARP.speed, brakeV);
+    c.phase = wantV < WARP.speed ? 'brake' : (this.warpV > WARP.speed * 0.9 ? 'cruise' : 'accel');
+    this.warpV += (wantV - this.warpV) * damp(c.phase === 'brake' ? WARP.brake : WARP.accel, dt);
+    if (c.phase !== 'brake' && this.warpV < wantV) this.warpV += SHIP.maxSpeed * 0.8 * dt;   // kick off the exponential from low speed
+    const step = Math.min(this.warpV * dt, remaining);
+    g.position.addScaledVector(_dir, step);
+    this.vel.copy(_dir).multiplyScalar(this.warpV);
+    this.speed = this.warpV;
+    // nose locked on the target
+    _m.lookAt(g.position, c.obj.position, UP); _q.setFromRotationMatrix(_m); g.quaternion.slerp(_q, damp(6, dt));
+    this.warpW += (clamp(this.warpV / WARP.speed * 1.4, 0, 1) - this.warpW) * damp(2.5, dt);
+    if (remaining <= 0.5) { this.cmd = { kind: 'stop' }; this.vel.copy(_dir).multiplyScalar(SHIP.maxSpeed * WARP.exitSpeed); this.speed = this.vel.length(); }
+    return true;
+  }
+
   update(dt) {
     const g = this.group;
+    if (this.updateWarp(dt)) { this.updateVisuals(dt, 1); return; }
     this.wanted(_want);
     if (this.cmd.kind === 'stop' && this.cmd.obj) this.cmd = { kind: 'stop' };
 
@@ -122,9 +166,14 @@ export class Ship {
       this.yawRate = turned / Math.max(dt, 1e-4) * side;
     } else this.yawRate = 0;
 
-    // visuals
     const wantSpeed = _want.length() / SHIP.maxSpeed;
     this.thrustLevel += (clamp(wantSpeed, 0, 1) - this.thrustLevel) * damp(8, dt);
+    this.updateVisuals(dt, this.thrustLevel);
+  }
+
+  /** bank, orbit bend, corkscrew, warp stretch, shield, and the design's own animation */
+  updateVisuals(dt, thrust) {
+    const g = this.group;
     // roll into turns (left wing dips when turning left), plus a lean toward the target while orbiting
     let wantBank = clamp(this.yawRate / SHIP.turn, -1, 1) * SHIP.bank;
     if (this.cmd.kind === 'orbit') {
@@ -147,7 +196,7 @@ export class Ship {
     this.shield = clamp(this.shield + SHIP.shieldRegen * dt, 0, this.shieldMax);
     this.shieldHit = Math.max(0, this.shieldHit - dt * 3);
     this.shieldFx.update(dt, this.shieldHit, this.shield / this.shieldMax);
-    for (const e of this.engines) { const s = 0.9 + this.thrustLevel * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + this.thrustLevel * 0.4; }
+    for (const e of this.engines) { const s = 0.9 + thrust * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + thrust * 0.4; }
     // orbit bend: fade in as the ship settles on the ring; radius in the model's local units, centre on the target's side
     const orbiting = this.cmd.kind === 'orbit';
     let bendR = 0, bendSide = 1;
@@ -162,7 +211,13 @@ export class Ship {
     this.spinRate += ((orbiting ? SHIP.orbitSpin * this.bendW : 0) - this.spinRate) * damp(2, dt);
     this.spin = (this.spin + this.spinRate * dt) % (Math.PI * 2);
     if (!orbiting && this.spinRate < 0.05) this.spin += (0 - this.spin) * damp(1.5, dt);   // settle upright once the spin dies
-    this.model.update(dt, { thrust: this.thrustLevel, speedFrac: this.speed / SHIP.maxSpeed, orbiting, bend: { R: bendR, side: bendSide, w: this.bendW, spin: this.spin } });
+    this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / SHIP.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { R: bendR, side: bendSide, w: this.bendW, spin: this.spin } });
+    // warp: stretch the vessel along its axis and run the tunnel
+    const ws = this.warpW;
+    this.model.group.scale.set(SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 - ws * 0.35), SHIP.scale * (1 + ws * WARP.stretch));
+    this.warpFx.update(dt, ws, this.warpV);
+    this.model.group.rotation.z = 0;
+
   }
 
   damage(n) {
