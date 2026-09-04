@@ -65,7 +65,8 @@ const { ship, rocks, selection, marker, stars } = game;
 /** run a command against the selected target (or stop) */
 game.command = (name) => {
   const t = selection.obj;
-  if (name === 'stop') return ship.stop();
+  if (name === 'auto') return game.toggleAuto();
+  if (name === 'stop') { if (game.auto) game.toggleAuto(); game.lance.stop(); return ship.stop(); }
   if (!t) return;
   if (name === 'approach') ship.approach(t);
   if (name === 'orbit') ship.orbit(t);
@@ -78,7 +79,7 @@ game.command = (name) => {
       if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, LANCE.range * 0.6)); else ship.keepAtRange(t, LANCE.harvestGap);   // siphon: hold 60 m off the cloud
     }
   }
-  if (name === 'warp') { if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
+  if (name === 'warp') { if (game.auto) game.toggleAuto(); if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
 };
 /** select obj; if the ship is busy with a target command, re-issue it against the new target */
 game.retarget = (obj) => {
@@ -87,6 +88,22 @@ game.retarget = (obj) => {
   const k = ship.cmd.kind;
   if (k === 'orbit' || k === 'approach' || k === 'keep') game.command(k);
   if (k === 'warp' && ship.cmd.phase === 'align') game.command('warp');
+};
+/** auto harvest: keep siphoning the nearest condensate until none are left in reach */
+game.auto = false;
+game.toggleAuto = () => {
+  game.auto = !game.auto;
+  if (game.auto) { game.autoNext(); ui.flash('Auto harvest on'); } else ui.flash('Auto harvest off');
+  ui.setAuto(game.auto);
+};
+game.autoNext = () => {
+  const p = ship.position;
+  let best = null, bd = Infinity;
+  for (const c of rocks.list) { const d = c.position.distanceTo(p); if (d < bd && d < ROCK.autoRange) { bd = d; best = c; } }
+  if (!best) { game.auto = false; ui.setAuto(false); ui.flash('Nothing left to harvest in reach'); return; }
+  selection.set(best);
+  game.lance.fire(best);
+  if (best.position.distanceTo(p) - best.radius > LANCE.range) ship.keepAtRange(best, LANCE.harvestGap);
 };
 game.toggleMode = () => {
   game.direct = !game.direct;
@@ -109,7 +126,7 @@ function pickRock(ndc) {
   for (const st of sites.list) { const v = st.position.clone().project(camera); if (v.z > 1) continue; const d = Math.hypot(v.x - ndc[0], (v.y - ndc[1]) / camera.aspect); if (d < bd) { bd = d; best = st; } }
   return best;
 }
-let zoom = 1, camYaw = 0, camPitch = CAMERA.pitch0;
+let zoom = 1, camYaw = 0, camPitch = CAMERA.pitch0, savedZoom = null;
 game.tracking = false;
 game.toggleTrack = () => { game.tracking = !game.tracking; ui.setTracking(game.tracking); };
 bindPointer(host, {
@@ -128,7 +145,7 @@ bindPointer(host, {
     camYaw -= dx * CAMERA.orbitSpeed;
     camPitch = clamp(camPitch + dy * CAMERA.orbitSpeed, CAMERA.pitchRange[0], CAMERA.pitchRange[1]);
   },
-  onWheel(dy) { zoom = clamp(zoom * (dy > 0 ? 1.1 : 0.9), CAMERA.zoom[0], CAMERA.zoom[1]); },
+  onWheel(dy) { if (ship.cmd.kind === 'warp') return; zoom = clamp(zoom * (dy > 0 ? 1.1 : 0.9), CAMERA.zoom[0], CAMERA.zoom[1]); if (savedZoom !== null) savedZoom = null; },
 });
 window.addEventListener('keydown', (e) => {
   if (e.target !== document.body) return;
@@ -142,6 +159,7 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyE') game.command('keep');
     if (e.code === 'KeyS') game.command('warp');
     if (e.code === 'KeyF') game.command('lance');
+    if (e.code === 'KeyA') game.command('auto');
   }
 });
 
@@ -169,14 +187,21 @@ function updateCamera(dt) {
     return;
   }
   const d = CAMERA.dist * zoom;
-  // warp: swing in behind the ship and look down the line it will travel; animated over the align phase
+  // warp: swing in behind the ship and look down the line it will travel; animated over the align phase.
+  // Also zoom in close so the tunnel streaks fill the screen, remembering the player's zoom to restore on drop-out.
   if (ship.cmd.kind === 'warp') {
+    if (savedZoom === null) savedZoom = zoom;
+    zoom += (CAMERA.warpZoom - zoom) * damp(CAMERA.warpLerp, dt);
     ship.forward(tmp);
     const wantYaw = Math.atan2(-tmp.x, -tmp.z);
     let dy = wantYaw - camYaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     camYaw += dy * damp(CAMERA.warpLerp, dt);
     camPitch += (CAMERA.warpPitch - camPitch) * damp(CAMERA.warpLerp, dt);
-  } else if (game.tracking && selection.obj) {
+  } else if (savedZoom !== null) {
+    zoom += (savedZoom - zoom) * damp(2.2, dt);   // ease back to what the player had
+    if (Math.abs(zoom - savedZoom) < 0.01) { zoom = savedZoom; savedZoom = null; }
+  }
+  if (ship.cmd.kind !== 'warp' && game.tracking && selection.obj) {
   // tracking: swing the orbit so the camera sits on the far side of the ship from the target and looks across at it
     tmp.copy(selection.obj.position).sub(pivot);
     const wantYaw = Math.atan2(-tmp.x, -tmp.z);
@@ -208,6 +233,7 @@ function frame(now) {
   ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);
   rocks.update(dt, (rock) => {
+    if (game.auto && game.lance.target === rock) setTimeout(() => game.auto && game.autoNext(), 400);
     game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint, rock.energy.key);
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
@@ -228,6 +254,7 @@ function frame(now) {
     }
   });
   game.lance.update(dt);
+  if (game.auto && (!game.lance.on || !game.lance.target || game.lance.target.dead)) game.autoNext();
   game.loot.update(dt);
   streams.update(dt);
   game.rifts.update(dt);

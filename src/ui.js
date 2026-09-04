@@ -1,17 +1,20 @@
 // HTML overlay: HUD numbers, command bar, throttle, overview list, mode toggle. Reads game state, writes DOM, fires callbacks.
 import * as THREE from 'three';
 import { fmt, fmtDist } from './utils.js';
-import { SHIP, WORLD, ENERGY_BY_KEY } from './config.js';
+import { SHIP, WORLD, ENERGY_BY_KEY, ROCK } from './config.js';
 import { DESIGNS } from './ships/index.js';
 import { HudFx, setHudDt } from './hudfx.js';
+import { ResizablePanel } from './panel.js';
+import { Settings } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   speed: $('hud-speed'), pos: $('hud-pos'), scrap: $('hud-scrap'), shield: $('bar-shield'), hull: $('bar-hull'), help: $('help'),
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
-  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), auto: $('btn-auto'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
+  warp: $('warp-readout'), warpSpeed: $('warp-speed'), warpLeft: $('warp-left'),
   yield: $('yield-num'), yieldMax: $('yield-max'), yieldKind: $('yield-kind'), holdList: $('hold-list'), threat: $('threat-name'), threatDist: $('threat-dist'), shieldNum: $('threat-shield'),
 };
 
@@ -20,8 +23,10 @@ export class UI {
     this.game = game;
     this.rows = new Map();
     this.overviewTimer = 0;
+    this.overviewPanel = new ResizablePanel($('overview'));
+    this.settings = new Settings();
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyH') el.help.hidden = !el.help.hidden; });
-    for (const b of el.cmd.querySelectorAll('[data-cmd]')) b.addEventListener('click', () => game.command(b.dataset.cmd));
+    for (const b of document.querySelectorAll('[data-cmd]')) b.addEventListener('click', () => game.command(b.dataset.cmd));
     for (const r of SHIP.ranges) {
       const b = document.createElement('button'); b.textContent = r; b.dataset.range = r;
       b.addEventListener('click', () => { game.ship.range = r; if (game.ship.cmd.range) game.ship.cmd.range = r; this.syncRanges(); });
@@ -77,6 +82,7 @@ export class UI {
     if (!silent) { document.body.classList.remove('morphing'); void document.body.offsetWidth; document.body.classList.add('morphing'); }
   }
   flash(msg) { el.flash.textContent = msg; el.flash.classList.add('on'); clearTimeout(this.flashT); this.flashT = setTimeout(() => el.flash.classList.remove('on'), 2200); }
+  setAuto(on) { el.auto.classList.toggle('on', on); }
   setTracking(on) { el.track.classList.toggle('on', on); }
   syncRanges() { for (const b of el.ranges.children) b.classList.toggle('on', +b.dataset.range === this.game.ship.range); }
   setMode(direct) {
@@ -125,7 +131,7 @@ export class UI {
     const sel = selection.obj;
     el.cmd.classList.toggle('has-target', !!sel);
     el.cmd.dataset.kind = sel ? sel.kind : 'none';
-    if (sel) { el.cmdTitle.textContent = sel.name; el.cmdDist.textContent = fmtDist(sel.position.distanceTo(p) - sel.radius, WORLD.auUnits); }
+    if (sel) { el.cmdTitle.textContent = sel.name; const txt = fmtDist(sel.position.distanceTo(p) - sel.radius, WORLD.auUnits, ship.warping ? 1 : 2); el.cmdDist.textContent = txt; el.cmdDist.dataset.len = txt.length > 8 ? 'long' : txt.length > 6 ? 'mid' : 'short'; }
     else { el.cmdTitle.textContent = 'No target'; el.cmdDist.textContent = ''; }
     el.hp.hidden = !(sel && sel.hpMax);
     if (sel && sel.hpMax) el.hpFill.style.width = (sel.hp / sel.hpMax * 100) + '%';
@@ -141,6 +147,12 @@ export class UI {
     if (want !== this.hud && !this.hudLock) this.setHud(want);
     if (this.hud === 'harvest' && sel && sel.hpMax) { el.yield.textContent = Math.round(sel.radius * 4 * (sel.hp / sel.hpMax)); el.yieldMax.textContent = Math.round(sel.radius * 4); if (sel.energy) el.yieldKind.textContent = `${sel.energy.name} bound in the condensate`; }
     this.updateHold();
+    // auto harvest offer: only when a condensate is within reach
+    const nearCloud = rocks.list.some((c) => c.position.distanceTo(p) - c.radius < ROCK.autoShow);
+    el.auto.hidden = !(nearCloud || this.game.auto) || ship.warping;
+    // warp readout above the command core: speed in AU/s and distance left, steady numbers
+    el.warp.hidden = !ship.warping;
+    if (ship.warping) { el.warpSpeed.textContent = (ship.speed / WORLD.auUnits).toFixed(2); el.warpLeft.textContent = ((ship.cmd.obj.position.distanceTo(p)) / WORLD.auUnits).toFixed(1); }
     if (this.hud === 'combat') { const foe = sel && sel.kind === 'mob' ? sel : threat; el.threat.textContent = foe ? `${foe.name} · ${Math.round(foe.hp)} / ${foe.hpMax}` : 'No hostile locked'; el.threatDist.textContent = foe ? fmtDist(foe.position.distanceTo(p), WORLD.auUnits) : ''; el.shieldNum.textContent = Math.round(ship.shield) + ' / ' + ship.shieldMax; }
 
     // overview: refresh a few times a second, rows keyed by object
@@ -165,6 +177,7 @@ export class UI {
       row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
       row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
+      if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed' }[o.type] || ''; }
       keep.add(o); order.push(row);
     }
     for (const [o, row] of this.rows) if (!keep.has(o)) { row.remove(); this.rows.delete(o); }

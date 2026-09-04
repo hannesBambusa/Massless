@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { COLORS } from './config.js';
 import { rnd, TAU } from './utils.js';
 
-const N = 320, LEN = 140, R0 = 6, R1 = 26;
+const N = 420, LEN = 160, R0 = 4, R1 = 34;   // wide enough to surround a close camera
 
 export class WarpFx {
   constructor(parent) {

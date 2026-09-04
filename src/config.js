@@ -54,6 +54,8 @@ export const WORLD = {
   streams: 4,          // helical energy streams per harvest site
   overviewRange: 400,  // rocks listed in the overview (sites are always listed)
   auUnits: 2500,       // world units per AU for the HUD (local distances stay in m)
+  hudGrid: 20,         // invisible screen grid (px) that resizable HUD panels snap to
+  overviewMin: [200, 120], // smallest overview panel [w, h] in px
 };
 
 export const CAMERA = {
@@ -68,6 +70,7 @@ export const CAMERA = {
   trackPitch: 0.3,     // elevation while tracking
   warpLerp: 1.6,       // how fast the camera swings in behind the ship for a warp
   warpPitch: 0.10,     // elevation while looking down the warp line
+  warpZoom: 0.55,      // zoom factor during warp (close, so the tunnel fills the screen); the player's zoom returns after
   fov: 60,
 };
 
@@ -83,6 +86,8 @@ export const ROCK = {             // energy condensates: the harvestable things
   hpPerRadius: 9,      // hp = radius * this
   scrapPerRadius: 4,   // scrap on unbinding
   motesPerRadius: 5,
+  autoRange: 1600,     // auto harvest only considers condensates this close
+  autoShow: 1000,      // the auto harvest offer appears when a condensate is within this
 };
 
 /** the kinds of bound energy a condensate can be made of. key: inventory slot, name: what the player sees */

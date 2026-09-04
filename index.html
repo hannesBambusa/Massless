@@ -23,6 +23,7 @@
       <symbol id="i-lance" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.5"/><path d="M7.5 12c3-3 6 3 9 0M7.5 12c3 3 6-3 9 0"/><circle cx="19.5" cy="12" r="2" class="fill"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
       <symbol id="i-harvest" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity=".8"/></symbol>
+      <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9"/><path d="M21 12a9 9 0 0 1-9 9"/><path d="M12 21a9 9 0 0 1-9-9"/><path d="M19 9l2 3-3 1M5 15l-2-3 3-1"/></symbol>
       <symbol id="i-track" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" class="fill"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
     </defs>
   </svg>
@@ -39,6 +40,7 @@
     <div id="hud-modes"><button data-hud="nav" class="on" title="Navigation HUD (1)">Nav</button><button data-hud="harvest" title="Harvest HUD (2)">Harvest</button><button data-hud="combat" title="Combat HUD (3)">Combat</button></div>
     <select id="sel-design" title="Ship design"></select>
     <button id="btn-mode" class="chip" title="Toggle command / direct flight (V)">COMMAND</button>
+    <button id="btn-settings" class="chip" title="Settings (O)">⚙</button>
   </div>
 
   <div id="target-label" hidden><span id="tl-arrow">➤</span><span id="tl-name"></span><span id="tl-dist"></span></div>
@@ -99,6 +101,10 @@
 
   <div id="hold"><div class="hold-title">Hold</div><div id="hold-list"></div></div>
 
+  <div id="warp-readout" hidden><span class="wl">Warp</span><span id="warp-speed">0</span><span class="wu">AU/s</span><span class="wsep"></span><span id="warp-left">0</span><span class="wu">AU left</span></div>
+
+  <button id="btn-auto" data-cmd="auto" title="Auto harvest: siphon the nearest condensates one after another (A)" hidden><svg><use href="#i-auto"/></svg><span class="al">Auto harvest</span><span class="ak">A</span></button>
+
   <div id="flash"></div>
 
   <!-- vitals: two arcs of energy bottom-left -->
@@ -107,8 +113,21 @@
     <div class="bar hull"><span class="lbl">Hull</span><div class="track"><div id="bar-hull" class="fill"></div></div></div>
   </div>
 
+  <!-- settings: a small overlay, toggled with the gear or O -->
+  <div id="settings" hidden>
+    <div class="set-panel">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="ov-head"><span class="ov-title">Settings</span><span class="ov-sub">how the HUD reads</span></div>
+      <label class="set-row"><span>Text size</span>
+        <input id="set-font" type="range" min="0.7" max="1.8" step="0.05" value="1">
+        <span id="set-font-val" class="set-val">100%</span>
+      </label>
+      <div class="set-actions"><button id="set-reset" class="chip">Reset</button><button id="set-close" class="chip">Close</button></div>
+    </div>
+  </div>
+
   <div id="help">
-    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>S</b> warp to site · <b>F</b> lance / siphon · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>1 / 2 / 3</b> HUD nav / harvest / combat · <b>Space</b> stop · <b>V</b> direct mode</span>
+    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>S</b> warp to site · <b>F</b> lance / siphon · <b>A</b> auto harvest · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>1 / 2 / 3</b> HUD nav / harvest / combat · <b>Space</b> stop · <b>V</b> direct mode · <b>O</b> settings · <b>H</b> hide help</span>
     <span id="help-direct" hidden><b>W / S</b> thrust · <b>A / D</b> strafe · <b>R / F</b> up / down · <b>Wheel</b> zoom · <b>Space</b> stop · <b>V</b> command mode</span>
     · <b>H</b> hide
   </div>

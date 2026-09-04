@@ -61,7 +61,7 @@ Condensates come in kinds, each a colour and a name: Glacis (ice), Sol (gold), C
 
 ## Weapons
 
-Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F) is a sustained beam on the selected target. Against a condensate it is called the **Siphon** and takes the cloud's colour: lock builds over a second while the target stays within 120 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Fire it out of range and the ship closes in by itself: an orbit inside lance range for a wisp, an approach for a condensate. The command set follows the target: a condensate shows only Warp, Harvest and Stop; a wisp gets the full suite.
+Everything here is bound energy, so a weapon unbinds. The **Resonance lance** (F) is a sustained beam on the selected target. Against a condensate it is called the **Siphon** and takes the cloud's colour: lock builds over a second while the target stays within 120 m, damage scales with lock, the rock shivers and its lattice flickers. At zero it bursts into motes that fly to the ship and become scrap. Fire it out of range and the ship closes in by itself: an orbit inside lance range for a wisp, an approach for a condensate. **Auto harvest** (A) siphons the nearest condensate, then the next nearest, until none are left within 1.6 km; Stop or Warp switches it off. The command set follows the target: a condensate shows only Warp, Harvest and Stop; a wisp gets the full suite.
 
 ## Controls
 
