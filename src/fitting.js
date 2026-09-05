@@ -109,12 +109,13 @@ export function evaluateSets(shell, sets) {
   return sets.filter((s) => (counts[s.family] || 0) >= s.count).map((set) => ({ set, count: counts[set.family] }));
 }
 
-/** final stats: base -> online module modifiers -> active set modifiers. also returns resource state and active sets */
-export function calcStats(shell, sets) {
+/** final stats: base -> online module modifiers -> active set modifiers -> extra (skills). also returns resource state and active sets */
+export function calcStats(shell, sets, extra = []) {
   const mods = [];
   for (const f of fitted(shell)) if (f.online) mods.push(...f.module.modifiers);
   const active = evaluateSets(shell, sets);
   for (const a of active) mods.push(...a.set.modifiers);
+  mods.push(...extra);   // pilot skills and anything else outside the fit
   const stats = applyModifiers(baseStats(shell), mods);
   return { stats, sets: active, capacity: capacity(shell), usage: usage(shell) };
 }

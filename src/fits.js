@@ -4,7 +4,7 @@
 // Module families are the six bound energies; a module costs fragments of its own family.
 import { SHIP, LANCE, WORLD } from './config.js';
 
-const BASE = { integrity: SHIP.hull, shield: SHIP.shield, shieldRegen: SHIP.shieldRegen, maxSpeed: SHIP.maxSpeed, lanceDps: LANCE.dps, lanceRange: LANCE.range, lockTime: LANCE.lockTime, overviewRange: WORLD.overviewRange };
+const BASE = { integrity: SHIP.hull, shield: SHIP.shield, shieldRegen: SHIP.shieldRegen, maxSpeed: SHIP.maxSpeed, lanceDps: LANCE.dps, lanceRange: LANCE.range, lockTime: LANCE.lockTime, overviewRange: WORLD.overviewRange, harvestYield: 1 };
 const shell = (id, luminosity, coherence, corona, orbit, core, base = {}) => ({ id, luminosity, coherence, slots: { corona, orbit, core }, base: { ...BASE, ...base } });
 
 /** one shell per vessel design; the design you fly is the shell you fit */
@@ -17,6 +17,9 @@ export const SHELLS = {
   ember:  shell('ember',  150,  80, 3, 1, 3, { lanceDps: LANCE.dps * 1.2, shield: SHIP.shield * 0.8 }),
   loom:   shell('loom',   100, 140, 1, 3, 3, { lockTime: LANCE.lockTime * 0.8 }),
   medusa: shell('medusa', 110, 110, 1, 3, 3, { shield: SHIP.shield * 1.3, maxSpeed: SHIP.maxSpeed * 0.9 }),
+  cairn:  shell('cairn',  140, 100, 2, 2, 3, { integrity: SHIP.hull * 1.4, maxSpeed: SHIP.maxSpeed * 0.85 }),
+  chord:  shell('chord',  100, 150, 3, 3, 1, { lockTime: LANCE.lockTime * 0.7, lanceRange: LANCE.range * 1.15 }),
+  nautilus: shell('nautilus', 120, 110, 1, 2, 4, { shieldRegen: SHIP.shieldRegen * 1.5, shield: SHIP.shield * 1.1 }),
 };
 
 const flat = (stat, value) => ({ stat, value, isPercentage: false });
@@ -59,5 +62,5 @@ export const SETS = [
   { id: 'ash-2',    family: 'ash',    count: 2, name: 'Ash harmony',    modifiers: [pct('lockTime', -15)], desc: '-15% lock time' },
 ];
 
-export const STAT_LABELS = { integrity: 'Integrity', shield: 'Shield', shieldRegen: 'Shield regen', maxSpeed: 'Speed', lanceDps: 'Lance', lanceRange: 'Lance range', lockTime: 'Lock time', overviewRange: 'Overview', luminosity: 'Luminosity', coherence: 'Coherence' };
+export const STAT_LABELS = { integrity: 'Integrity', shield: 'Shield', shieldRegen: 'Shield regen', maxSpeed: 'Speed', lanceDps: 'Lance', lanceRange: 'Lance range', lockTime: 'Lock time', overviewRange: 'Overview', harvestYield: 'Yield', luminosity: 'Luminosity', coherence: 'Coherence' };
 export const SLOT_LABELS = { corona: 'Corona', orbit: 'Orbit', core: 'Core' };

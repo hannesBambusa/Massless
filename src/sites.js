@@ -28,7 +28,7 @@ export class Sites {
   dispose() { this.scene.remove(this.group); }
   /** floating origin: sites keep double-precision positions on the CPU, so shifting them is exact */
   shift(d) { for (const s of this.list) s.position.sub(d); }
-  get home() { return this.list.find((s) => s.home) || this.list[0]; }
+  get home() { return this.list.find((s) => s.home) || this.list[0]; }   // the haven when this system has one, else the first site
 
   build(def) {
     const g = new THREE.Group();

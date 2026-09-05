@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FoldPass } from './foldpass.js';
-import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP, WORLD } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP, WORLD, WEAPONS, ENERGY_BY_KEY } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
@@ -15,7 +15,9 @@ import { Sites } from './sites.js';
 import { Rifts } from './rift.js';
 import { SYSTEMS, systemById, lyBetween, AU } from './systems.js';
 import { Gate } from './gate.js';
+import { Haven } from './haven.js';
 import { Lance } from './weapons/lance.js';
+import { Arsenal } from './weapons/arsenal.js';
 import { Loot } from './loot.js';
 import { Mobs } from './mobs.js';
 import { Marker } from './marker.js';
@@ -25,6 +27,7 @@ import { keys, bindPointer } from './input.js';
 import { clamp, damp } from './utils.js';
 import { loadProgress, ProgressSaver } from './save.js';
 import { Loadout } from './loadout.js';
+import { Training } from './training.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // retina at 2x doubles the bloom cost for little gain
@@ -60,7 +63,8 @@ const game = {
 };
 /** build a system around the ship: sites, streams, condensates, wisps, rifts. Unloads whatever was there. */
 game.loadSystem = (id) => {
-  for (const k of ['rifts', 'mobs', 'rocks', 'streams', 'sites', 'gate']) if (game[k]) game[k].dispose();
+  for (const k of ['rifts', 'mobs', 'rocks', 'streams', 'sites', 'gate', 'haven']) if (game[k]) game[k].dispose();
+  game.haven = null;
   const sys = systemById(id);
   game.system = sys;
   game.sites = new Sites(scene, sys.sites);
@@ -68,8 +72,10 @@ game.loadSystem = (id) => {
   game.streams = new Streams(scene, harvest.map((x) => x.position));
   game.rocks = new Asteroids(scene, game.sites.list, game.streams);
   game.mobs = new Mobs(scene, game.sites.list);
+  if (game.arsenal) { game.arsenal.mobs = game.mobs; game.arsenal.reset(); }
   game.rifts = new Rifts(scene, combat);
   game.gate = new Gate(scene, sys.gate);
+  if (sys.haven) { game.haven = new Haven(scene, sys.haven); game.sites.list.unshift(game.haven.group); }   // the haven is the home site of its system
   game.origin.set(0, 0, 0);
   game.sites.list.push(game.gate.group);   // the gate is a site: listed, selectable, warpable
   game.stars.setNebula(sys.nebula, sys.star);
@@ -79,7 +85,7 @@ game.loadSystem = (id) => {
 game.rebase = () => {
   const d = ship.position.clone();
   if (d.lengthSq() < WORLD.rebaseAt * WORLD.rebaseAt) return;
-  for (const k of ['sites', 'streams', 'rocks', 'mobs', 'rifts', 'gate', 'loot', 'stars']) if (game[k] && game[k].shift) game[k].shift(d);
+  for (const k of ['sites', 'streams', 'rocks', 'mobs', 'rifts', 'gate', 'loot', 'stars', 'arsenal']) if (game[k] && game[k].shift) game[k].shift(d);
   ship.shift(d);
   pivot.sub(d); camera.position.sub(d);
   game.origin.add(d);   // where the world origin is now, in absolute metres (for the position readout)
@@ -88,10 +94,12 @@ game.origin = new THREE.Vector3();
 game.loadSystem('alpha');
 game.selection = new Selection(scene, camera);
 game.lance = new Lance(scene, game.ship);
+game.arsenal = new Arsenal(scene, game.ship, game.mobs);
 for (const k of ["hold", "fits", "owned"]) if (!game.state[k]) game.state[k] = {};
 game.saver = new ProgressSaver(game.state);
+game.training = new Training(game);   // skills: learned boxes, paid in fragments
 game.loadout = new Loadout(game);   // fitting: shells, owned modules, derived stats
-game.loot = new Loot(scene, game.ship, (key, n) => { game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark(); });
+game.loot = new Loot(scene, game.ship, (key, n) => { n *= game.ship.stats.harvestYield || 1; game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark(); });
 const { ship, selection, marker, stars } = game;
 
 /** run a command against the selected target (or stop) */
@@ -108,6 +116,12 @@ game.command = (name) => {
       setTimeout(() => ship.trail.reset(ship.position, ship.forward(new THREE.Vector3())), 50);
       return game.gate.arrivalPoint();   // arrivals emerge scattered around the gate
     }, () => ui.announce('Fold complete', `Current system: ${sys.name}`));
+    return;
+  }
+  if (name === 'pulse' || name === 'filament' || name === 'fracture') {
+    const why = game.arsenal.fire(name, t);
+    if (why === 'range') { ship.orbit(t, Math.min(ship.range, WEAPONS[name].range * 0.6)); ui.flash(`${WEAPONS[name].name}: closing to range`); }   // out of range: close in, fire again when there
+    else if (why) ui.flash(`${WEAPONS[name].name}: ${why}`);
     return;
   }
   if (name === 'auto') return game.toggleAuto();
@@ -150,14 +164,32 @@ game.autoNext = () => {
   game.lance.fire(best);
   if (best.position.distanceTo(p) - best.radius > ship.stats.lanceRange) ship.keepAtRange(best, LANCE.harvestGap);
 };
+/** hull at zero: announce, then re-form at the system's home site with shield and hull whole */
+game.die = () => {
+  game.dying = true;
+  game.lance.stop();
+  if (game.auto) game.toggleAuto();
+  ui.announce('Unbound', 'The core re-forms at ' + game.sites.home.name);
+  setTimeout(game.respawn, 1500);
+};
+game.respawn = () => {
+  ship.hull = ship.hullMax; ship.shield = ship.shieldMax;
+  ship.cmd = { kind: 'stop' };
+  ship.position.copy(game.haven ? game.haven.spawnPoint() : game.sites.home.position.clone().add(new THREE.Vector3(0, 0, 160)));
+  ship.trail.reset(ship.position, ship.forward(new THREE.Vector3()));
+  game.snapCamera = true;
+  for (const m of game.mobs.list) m.aggro = false;
+  game.dying = false;
+};
 game.toggleMode = () => {
   game.direct = !game.direct;
   ship.stop();
   ui.setMode(game.direct);
 };
-ship.position.copy(game.sites.home.position).add(new THREE.Vector3(0, 0, 160));   // start a little off the home beacon
+ship.position.copy(game.haven ? game.haven.spawnPoint() : game.sites.home.position.clone().add(new THREE.Vector3(0, 0, 160)));   // you wake inside your haven
+game.snapCamera = true;   // the first rebase moves the world under the ship; the camera must land with it
 const ui = new UI(game);
-game.overlayOpen = () => ui.fitting.open || ui.settings.open;
+game.overlayOpen = () => ui.fitting.open || ui.settings.open || ui.skills.open;
 ui.setMode(false);
 
 // pointer: click selects, double-click in space flies that way, drag orbits the camera, wheel zooms
@@ -177,7 +209,7 @@ game.tracking = false;
 game.toggleTrack = () => { game.tracking = !game.tracking; ui.setTracking(game.tracking); };
 bindPointer(host, {
   onClick(ndc) { selection.set(pickRock(ndc)); },
-  onRightClick(ndc) { game.retarget(pickRock(ndc)); },
+  onRightClick(ndc) { const r = pickRock(ndc); if (r) { selection.set(r); game.command('orbit'); } },   // right-click: select and orbit at the chosen range
   onDouble(ndc) {
     const rock = pickRock(ndc);
     if (rock) { selection.set(rock); return ship.approach(rock); }
@@ -205,6 +237,9 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyE') game.command('keep');
     if (e.code === 'KeyS') game.command('warp');
     if (e.code === 'KeyF') game.command('lance');
+    if (e.code === 'KeyG') game.command('pulse');
+    if (e.code === 'KeyT') game.command('filament');
+    if (e.code === 'KeyR') game.command('fracture');
     if (e.code === 'KeyA') game.command('auto');
     if (e.code === 'KeyJ') game.command('jump');
   }
@@ -295,7 +330,8 @@ function frame(now) {
     if (ship.cmd.obj === rock) ship.stop();
   });
   game.mobs.update(dt, ship, (mob) => {
-    game.loot.burst(mob.position, 14, MOB.scrap / 14, 0xff3d7a, 'ash');
+    game.loot.burst(mob.position, 14, mob.def.scrap / 14, ENERGY_BY_KEY[mob.def.drop].color, mob.def.drop);
+    if (mob.def.ash) game.loot.burst(mob.position, 6, mob.def.ash / 6, ENERGY_BY_KEY.ash.color, 'ash');
     if (selection.obj === mob) selection.clear();
     if (ship.cmd.obj === mob) ship.stop();
     // last wisp of a combat site: the rift collapses and a new tear opens elsewhere in the system
@@ -309,12 +345,16 @@ function frame(now) {
       ui.flash(`${st.name} rift collapsed. A new tear opens at ${fresh.name}`);
     }
   });
+  game.arsenal.update(dt);
+  // unbound: hull gone. Not while warping or folding (the ship can't be stopped mid-way); the vessel re-forms at home.
+  if (ship.hull <= 0 && !game.dying && ship.cmd.kind !== 'warp' && ship.cmd.kind !== 'jump') game.die();
   game.lance.update(dt);
   if (game.auto && (!game.lance.on || !game.lance.target || game.lance.target.dead)) game.autoNext();
   game.loot.update(dt);
   game.streams.update(dt);
   game.rifts.update(dt);
   game.gate.update(dt);
+  if (game.haven) game.haven.update(dt);
   game.sites.update(dt, camera.position);
   updateWarpLook();
   selection.update(dt);

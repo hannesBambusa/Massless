@@ -2,7 +2,7 @@
 // three concentric rings, and a double-helix tail. Everything hangs on one axis, forward is -Z.
 import * as THREE from 'three';
 import { COLORS } from '../config.js';
-import { glowSprite } from '../materials.js';
+import { glowSprite, glowLineMat } from '../materials.js';
 import { TAU, rnd, damp, clamp } from '../utils.js';
 import { Bender } from './bend.js';
 
@@ -10,7 +10,7 @@ export const id = 'prism';
 export const name = 'Prism';
 export const description = 'A crystal prow, spirograph lattices, a storm core and a helix wake. Opens into a mandala at rest, collapses into an arrow in flight.';
 
-const add = (color, mult = 1.2, opacity = 0.8) => new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(mult), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+const add = glowLineMat;
 const seg = (pts, mat) => new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), mat);
 
 /** mystic rose: n points on a circle, every point joined to every k-th other; reads as the gold lattice in the reference */

@@ -33,7 +33,7 @@ export class FitUI {
     $('btn-fit').addEventListener('click', () => this.toggle());
     $('fit-close').addEventListener('click', () => this.toggle(false));
     this.el.addEventListener('click', (e) => { if (e.target === this.el) this.toggle(false); });
-    window.addEventListener('keydown', (e) => { if (e.code === 'KeyG') this.toggle(); else if (e.code === 'Escape' && !this.el.hidden) this.toggle(false); });
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyN') this.toggle(); else if (e.code === 'Escape' && !this.el.hidden) this.toggle(false); });
     window.addEventListener('resize', () => { if (!this.el.hidden) this.render(); });
     this.lo.onChange(() => { if (!this.el.hidden) this.render(); });
     this.list.addEventListener('click', (e) => {

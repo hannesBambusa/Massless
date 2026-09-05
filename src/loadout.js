@@ -2,6 +2,7 @@
 // fragments, and pushing derived stats into the ship. State lives in game.state (fits, owned) so the saver persists it.
 import { SHELLS, MODULES, MODULE_BY_ID, SETS } from './fits.js';
 import { newShell, equip, unequip, canEquip, calcStats, relight, serialize, deserialize } from './fitting.js';
+import { skillModifiers } from './skills.js';
 
 export class Loadout {
   constructor(game) {
@@ -16,7 +17,7 @@ export class Loadout {
 
   /** recompute stats for the current shell, push them into the ship, persist */
   apply() {
-    const r = calcStats(this.shell, SETS);
+    const r = calcStats(this.shell, SETS, this.state.skills ? skillModifiers(this.state.skills) : []);
     this.result = r;
     this.game.ship.applyStats(r.stats);
     this.state.fits[this.shell.id] = serialize(this.shell);

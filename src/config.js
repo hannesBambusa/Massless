@@ -4,7 +4,7 @@ export const COLORS = {
   magenta: 0xff3df2, red: 0xff4d6d, orange: 0xff9f43,
   gold: 0xffd166, violet: 0xc084fc, green: 0x5eead4,
   ice: 0x9be7ff, sky: 0x60a5fa, bg: 0x050a1c, hull: 0x0b1030,
-  amber: 0xffb347, deep: 0x0b1f5c, nebula: 0x1e4fd8,
+  amber: 0xffb347, deep: 0x0b1f5c, nebula: 0x1e4fd8, lav: 0x9f8cff,
 };
 
 export const SHIP = {
@@ -96,6 +96,13 @@ export const LANCE = {
   dps: 22,             // at full lock
 };
 
+/** the other weapons: cooldown-driven, see weapons/arsenal.js */
+export const WEAPONS = {
+  pulse:    { name: 'Unbinding pulse', key: 'G', cooldown: 6,  range: 45,  dmg: 40, shove: 26 },
+  filament: { name: 'Filament',        key: 'T', cooldown: 9,  range: 110, dps: 9, duration: 8, leech: 0.6 },
+  fracture: { name: 'Fracture',        key: 'R', cooldown: 5,  range: 140, dmg: 55, speed: 160, hullCost: 4 },
+};
+
 export const ROCK = {             // energy condensates: the harvestable things
   hpPerRadius: 9,      // hp = radius * this
   scrapPerRadius: 4,   // scrap on unbinding
@@ -115,17 +122,9 @@ export const ENERGY = [
 ];
 export const ENERGY_BY_KEY = Object.fromEntries(ENERGY.map((e) => [e.key, e]));
 
-export const MOB = {              // wisps
-  perSite: 1,          // wisps at a harvest site
-  perCombatSite: 6,    // wisps pouring out of a rift
-  hp: 70,
-  speed: 34,
-  aggroRange: 180,     // starts hunting when the ship is this close
-  leashRange: 700,     // gives up beyond this
-  holdRange: 22,       // hunts to this distance, then circles
-  biteRange: 30,       // bleeds the shield within this
-  dps: 4,
-  scrap: 30,
+export const MOB = {              // per-kind numbers live in mobtypes.js
+  perCombatSite: 7,    // hostiles at a rift (a shoal pack counts as one)
+  leashRange: 700,     // a hostile gives up the hunt beyond this
 };
 
 export const BLOOM = { strength: 0.9, radius: 0.7, threshold: 0.2 };

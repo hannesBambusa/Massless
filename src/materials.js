@@ -4,6 +4,8 @@ import { COLORS } from './config.js';
 
 export const hullMat = (color = COLORS.hull) => new THREE.MeshBasicMaterial({ color });
 export const edgeMat = (color, glow = 1.6) => new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(glow), transparent: true, opacity: 1 });
+/** additive glowing line: the one helper every strand, tendril, ring and beam should use */
+export const glowLineMat = (color, mult = 1.2, opacity = 0.8) => new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(mult), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
 export const faintEdgeMat = (color, opacity = 0.35) => new THREE.LineBasicMaterial({ color, transparent: true, opacity });
 
 /** a mesh plus its glowing edge outline, grouped */

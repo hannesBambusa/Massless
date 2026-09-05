@@ -9,8 +9,9 @@ const au = (x, y, z) => [x * AU, y * AU, z * AU];
 export const SYSTEMS = [
   {
     id: 'alpha', name: 'Alpha Reach', ly: [0, 0, 0], star: COLORS.cyan, nebula: 0x1e4fd8, gate: { name: 'Reach Gate', pos: au(-2.1, 0.05, 1.4) },
+    haven: { name: 'Haven', pos: au(0.9, 0.2, 1.3) },   // the player's private home pocket
     sites: [
-      { name: 'Ash Reach', pos: [0, 0, 0], color: COLORS.cyan, type: 'harvest', home: true },
+      { name: 'Ash Reach', pos: [0, 0, 0], color: COLORS.cyan, type: 'harvest' },
       { name: 'Cinder Belt', pos: au(4.2, 0.12, -1.8), color: COLORS.amber, type: 'harvest' },
       { name: 'Vell Anchor', pos: au(-3.6, -0.2, -3.9), color: COLORS.sky, type: 'combat' },
       { name: 'The Hollow', pos: au(-5.2, 0.3, 2.4), color: COLORS.violet, type: 'combat' },

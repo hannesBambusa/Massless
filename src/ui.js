@@ -8,13 +8,14 @@ import { SYSTEMS, lyBetween } from './systems.js';
 import { ResizablePanel } from './panel.js';
 import { Settings } from './settings.js';
 import { FitUI } from './fitui.js';
+import { SkillUI } from './skillui.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   speed: $('hud-speed'), pos: $('hud-pos'), scrap: $('hud-scrap'), shield: $('bar-shield'), hull: $('bar-hull'), help: $('help'),
   cmd: $('cmd'), cmdTitle: $('cmd-title'), cmdDist: $('cmd-dist'), cmdStatus: $('cmd-status'), ranges: $('cmd-ranges'),
   throttle: $('throttle'), throttleNum: $('throttle-num'), overview: $('overview-list'), mode: $('btn-mode'), helpCmd: $('help-command'), helpDirect: $('help-direct'),
-  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), auto: $('btn-auto'), weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
+  design: $('sel-design'), track: $('btn-track'), flash: $('flash'), hp: $('cmd-hp'), hpFill: $('cmd-hp-fill'), lance: $('btn-lance'), harvest: $('btn-harvest'), auto: $('btn-auto'), weapons: { pulse: $('btn-pulse'), filament: $('btn-filament'), fracture: $('btn-fracture') }, weapon: $('weapon-status'), label: $('target-label'), labelName: $('tl-name'), labelDist: $('tl-dist'), labelArrow: $('tl-arrow'),
   gHp: $('g-hp'), gLock: $('g-lock'), gTicks: $('g-ticks'), gSpeed: $('g-speed'),
   sysList: $('system-list'),
   warp: $('warp-readout'), warpSpeed: $('warp-speed'), warpLeft: $('warp-left'),
@@ -29,6 +30,7 @@ export class UI {
     this.overviewPanel = new ResizablePanel($('overview'));
     this.settings = new Settings();
     this.fitting = new FitUI(game, (msg) => this.flash(msg));
+    this.skills = new SkillUI(game, (msg) => this.flash(msg));
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyH') el.help.hidden = !el.help.hidden; });
     for (const b of document.querySelectorAll('[data-cmd]')) b.addEventListener('click', () => game.command(b.dataset.cmd));
     for (const r of SHIP.ranges) {
@@ -138,7 +140,7 @@ export class UI {
     setHudDt(dt);
     el.speed.textContent = Math.round(ship.speed);
     const p = ship.position;
-    const o = this.game.origin; el.pos.textContent = fmtDist(Math.hypot(p.x + o.x, p.y + o.y, p.z + o.z), WORLD.auUnits) + ' from ' + (this.game.sites.home ? this.game.sites.home.name : 'home');
+    const home = this.game.sites.home; el.pos.textContent = home ? fmtDist(home.position.distanceTo(p), WORLD.auUnits) + ' from ' + home.name : '';
     el.scrap.textContent = fmt(this.game.state.scrap);
     el.shield.style.width = (ship.shield / ship.shieldMax * 100) + '%';
     el.hull.style.width = (ship.hull / ship.hullMax * 100) + '%';
@@ -146,6 +148,7 @@ export class UI {
     const lance = this.game.lance;
     el.weapon.textContent = lance.describe();
     el.lance.classList.toggle('on', lance.on); el.harvest.classList.toggle('on', lance.on);
+    for (const k in el.weapons) { const b = el.weapons[k], cd = this.game.arsenal.cooldown(k); b.style.setProperty('--cd', cd); b.classList.toggle('cooling', cd > 0); }
 
     const sel = selection.obj;
     el.cmd.classList.toggle('has-target', !!sel);
@@ -204,7 +207,7 @@ export class UI {
         if (act) act.addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button !== 0) return; selection.set(o); this.game.command('warp'); });
         // select on mouse-down: the list re-sorts while you hold the button, and a moved row would swallow a click
         row.addEventListener('mousedown', (e) => { if (e.button === 0) selection.set(o); });
-        row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.game.retarget(o); });
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); selection.set(o); this.game.command('orbit'); });
         row.addEventListener('dblclick', () => { selection.set(o); this.game.command('approach'); });
         this.rows.set(o, row);
       }
@@ -212,7 +215,7 @@ export class UI {
       if (o.kind === 'site') row.querySelector('.ov-act').hidden = ship.warping || d < 150;
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
       row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
-      if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed', gate: 'Gate: the dark hole folds open onto other systems; arrivals emerge around it' }[o.type] || ''; }
+      if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed', gate: 'Gate: the dark hole folds open onto other systems; arrivals emerge around it', haven: 'Haven: your home. Only you can warp here' }[o.type] || ''; }
       keep.add(o); order.push(row);
     }
     for (const [o, row] of this.rows) if (!keep.has(o)) { row.remove(); this.rows.delete(o); }

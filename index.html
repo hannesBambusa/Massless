@@ -24,6 +24,9 @@
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
       <symbol id="i-harvest" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity=".8"/></symbol>
       <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9"/><path d="M21 12a9 9 0 0 1-9 9"/><path d="M12 21a9 9 0 0 1-9-9"/><path d="M19 9l2 3-3 1M5 15l-2-3 3-1"/></symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" class="fill"/><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="10" opacity=".5"/></symbol>
+      <symbol id="i-filament" viewBox="0 0 24 24"><circle cx="4" cy="12" r="2"/><path d="M6 12c3-4 5 4 8 0s4 2 6 0"/><circle cx="20" cy="12" r="2" class="fill"/></symbol>
+      <symbol id="i-fracture" viewBox="0 0 24 24"><path d="M12 3l7 9-7 9-7-9z"/><path d="M12 3v18M5 12h14" opacity=".5"/></symbol>
       <symbol id="i-track" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" class="fill"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
     </defs>
   </svg>
@@ -40,7 +43,8 @@
     <div id="hud-modes"><button data-hud="nav" class="on" title="Navigation HUD (1)">Nav</button><button data-hud="harvest" title="Harvest HUD (2)">Harvest</button><button data-hud="combat" title="Combat HUD (3)">Combat</button></div>
     <select id="sel-design" title="Ship design"></select>
     <button id="btn-mode" class="chip" title="Toggle command / direct flight (V)">COMMAND</button>
-    <button id="btn-fit" class="chip" title="Fitting (G)">FIT</button>
+    <button id="btn-fit" class="chip" title="Fitting (N)">FIT</button>
+    <button id="btn-skills" class="chip" title="Skills (K)">SKILLS</button>
     <button id="btn-settings" class="chip" title="Settings (O)">⚙</button>
   </div>
 
@@ -76,12 +80,13 @@
     </div>
     <div class="cmd-side">
       <div class="cmd-buttons">
-        <button data-cmd="approach" title="Approach (Q)"><svg><use href="#i-approach"/></svg><span>Q</span></button>
-        <button data-cmd="orbit" title="Orbit at range (W)"><svg><use href="#i-orbit"/></svg><span>W</span></button>
         <button data-cmd="keep" title="Keep at range (E)"><svg><use href="#i-keep"/></svg><span>E</span></button>
         <button data-cmd="warp" title="Warp to target (S)" class="warp"><svg><use href="#i-warp"/></svg><span>S</span></button>
         <button data-cmd="lance" id="btn-lance" title="Resonance lance (F)" class="lance mob-only"><svg><use href="#i-lance"/></svg><span>F</span></button>
         <button data-cmd="lance" id="btn-harvest" title="Siphon (F)" class="lance cloud-only"><svg><use href="#i-harvest"/></svg><span>F</span></button>
+        <button data-cmd="pulse" id="btn-pulse" title="Unbinding pulse: hurts and shoves everything within 45 m (G)" class="weapon mob-only"><svg><use href="#i-pulse"/></svg><span>G</span></button>
+        <button data-cmd="filament" id="btn-filament" title="Filament: wraps the target, drains it for 8 s and knits your shield (T)" class="weapon mob-only"><svg><use href="#i-filament"/></svg><span>T</span></button>
+        <button data-cmd="fracture" id="btn-fracture" title="Fracture: a shard of your lattice, burst damage, costs hull (R)" class="weapon mob-only"><svg><use href="#i-fracture"/></svg><span>R</span></button>
         <button id="btn-track" title="Track target with the camera (C)"><svg><use href="#i-track"/></svg><span>C</span></button>
         <button data-cmd="stop" title="Stop (Space)" class="stop"><svg><use href="#i-stop"/></svg><span>␣</span></button>
       </div>
@@ -147,6 +152,24 @@
     </div>
   </div>
 
+  <!-- skills: three professions, each a tree of boxes. novice at the root, four branches of four tiers, master on top -->
+  <div id="skills" hidden>
+    <div class="sk-panel">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="ticks"></div><div class="ticks bottom"></div>
+      <div class="fit-title"><span class="fit-glyph"></span><div><div class="fit-name">Skills</div><div class="fit-kicker">Professions of the core</div></div>
+        <div class="sk-points" id="sk-points"></div><button id="sk-close" class="chip">Close</button></div>
+      <div class="sk-tabs" id="sk-tabs"></div>
+      <div class="sk-body">
+        <div class="sk-tree" id="sk-tree"></div>
+        <aside class="sk-side">
+          <div class="fit-card sk-xp"><div class="fit-card-head">Hold</div><div id="sk-xp"></div></div>
+          <div class="fit-card sk-info"><div class="fit-card-head" id="sk-info-head">Box</div><div id="sk-info"></div></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
   <!-- settings: a small overlay, toggled with the gear or O -->
   <div id="settings" hidden>
     <div class="set-panel">
@@ -161,7 +184,7 @@
   </div>
 
   <div id="help">
-    <span id="help-command"><b>Click</b> select · <b>Right-click</b> select and keep current command · <b>Q / W / E</b> approach / orbit / keep range · <b>S</b> warp to site · <b>F</b> lance / siphon · <b>A</b> auto harvest · <b>J</b> fold to system · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>1 / 2 / 3</b> HUD nav / harvest / combat · <b>Space</b> stop · <b>V</b> direct mode · <b>G</b> fitting · <b>O</b> settings · <b>H</b> hide help</span>
+    <span id="help-command"><b>Click</b> select · <b>Double-click</b> approach · <b>Right-click</b> orbit at the chosen range · <b>E</b> keep range · <b>S</b> warp to site · <b>F</b> lance / siphon · <b>G / T / R</b> pulse / filament / fracture · <b>A</b> auto harvest · <b>J</b> fold to system · <b>Double-click</b> space to fly that way · <b>Drag</b> look · <b>Wheel</b> zoom · <b>C</b> track target · <b>1 / 2 / 3</b> HUD nav / harvest / combat · <b>Space</b> stop · <b>V</b> direct mode · <b>N</b> fitting · <b>K</b> skills · <b>O</b> settings · <b>H</b> hide help</span>
     <span id="help-direct" hidden><b>W / S</b> thrust · <b>A / D</b> strafe · <b>R / F</b> up / down · <b>Wheel</b> zoom · <b>Space</b> stop · <b>V</b> command mode</span>
     · <b>H</b> hide
   </div>

@@ -8,6 +8,9 @@ import * as gyre from './gyre.js';
 import * as ember from './ember.js';
 import * as loom from './loom.js';
 import * as medusa from './medusa.js';
+import * as cairn from './cairn.js';
+import * as chord from './chord.js';
+import * as nautilus from './nautilus.js';
 
-export const DESIGNS = [bloom, prism, shoal, kite, gyre, ember, loom, medusa];
+export const DESIGNS = [bloom, prism, shoal, kite, gyre, ember, loom, medusa, cairn, chord, nautilus];
 export const byId = (id) => DESIGNS.find((d) => d.id === id) || DESIGNS[0];
