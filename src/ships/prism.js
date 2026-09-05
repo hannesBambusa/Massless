@@ -10,7 +10,6 @@ export const id = 'prism';
 export const name = 'Prism';
 export const description = 'A crystal prow, spirograph lattices, a storm core and a helix wake. Opens into a mandala at rest, collapses into an arrow in flight.';
 
-const add = glowLineMat;
 const seg = (pts, mat) => new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), mat);
 
 /** mystic rose: n points on a circle, every point joined to every k-th other; reads as the gold lattice in the reference */
@@ -38,18 +37,18 @@ export function build() {
   for (let i = 1; i <= 4; i++) { prowPts.push(P[0], P[i], P[i], P[i % 4 + 1], P[5], P[i]); }
   const PROW_Z = -5.0;   // the prow's own origin sits mid-way so bending places it on the arc
   const prowGroup = new THREE.Group(); prowGroup.position.z = PROW_Z; group.add(prowGroup);
-  const prow = seg(prowPts.map((p) => p.clone().sub(new THREE.Vector3(0, 0, PROW_Z))), add(COLORS.sky, 1.4, 0.9)); prowGroup.add(prow);
+  const prow = seg(prowPts.map((p) => p.clone().sub(new THREE.Vector3(0, 0, PROW_Z))), glowLineMat(COLORS.sky, 1.4, 0.9)); prowGroup.add(prow);
   const prowTip = glowSprite(COLORS.ice, 1.4, 0.8); prowTip.position.set(0, 0, P[0].z - PROW_Z); prowGroup.add(prowTip);
   for (let i = 1; i <= 4; i++) { const s = glowSprite(COLORS.sky, 0.5, 0.9); s.position.copy(P[i]).sub(new THREE.Vector3(0, 0, PROW_Z)); prowGroup.add(s); }
 
   // lattice: two roses, a big one and a smaller one behind, counter-rotating
   // each rose sits in a carrier group: the carrier is placed on the arc, the rose spins inside it
-  const roseA = rose(24, 2.9, [5, 9], add(COLORS.gold, 1.1, 0.5)), roseAc = new THREE.Group(); roseAc.add(roseA); group.add(roseAc);
-  const roseB = rose(18, 2.0, [4, 7], add(COLORS.amber, 1.1, 0.45)), roseBc = new THREE.Group(); roseBc.add(roseB); group.add(roseBc);
+  const roseA = rose(24, 2.9, [5, 9], glowLineMat(COLORS.gold, 1.1, 0.5)), roseAc = new THREE.Group(); roseAc.add(roseA); group.add(roseAc);
+  const roseB = rose(18, 2.0, [4, 7], glowLineMat(COLORS.amber, 1.1, 0.45)), roseBc = new THREE.Group(); roseBc.add(roseB); group.add(roseBc);
   // spokes joining the roses so they read as one funnel
   const spokes = [];
   for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; spokes.push(new THREE.Vector3(Math.cos(a) * 2.9, Math.sin(a) * 2.9, -1.8), new THREE.Vector3(Math.cos(a + 0.4) * 2.0, Math.sin(a + 0.4) * 2.0, -0.6)); }
-  const spokeLines = seg(spokes, add(COLORS.gold, 1, 0.3)); group.add(spokeLines);
+  const spokeLines = seg(spokes, glowLineMat(COLORS.gold, 1, 0.3)); group.add(spokeLines);
 
   // core
   const CORE_Z = 0.6;
@@ -65,7 +64,7 @@ export function build() {
     const t = tendril(i, N);
     const pos = new Float32Array(t.samples * 3);
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const line = new THREE.Line(geo, add(i % 4 === 0 ? COLORS.gold : COLORS.sky, 1.3, 0.75)); line.frustumCulled = false;
+    const line = new THREE.Line(geo, glowLineMat(i % 4 === 0 ? COLORS.gold : COLORS.sky, 1.3, 0.75)); line.frustumCulled = false;
     group.add(line);   // samples are written in ship space (core offset added), so the bend can act on them
     tendrils.push({ ...t, pos, line });
   }
@@ -85,10 +84,10 @@ export function build() {
   }
   // the helix is rebuilt every frame in ship space (twist, stretch, bend), so its buffers are plain Float32Arrays
   const helixPos = [new Float32Array(HS * 3), new Float32Array(HS * 3)];
-  const helixLines = helixPos.map((pos, k) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const l = new THREE.Line(g, add(k ? COLORS.sky : COLORS.gold, 1.2, 0.8)); l.frustumCulled = false; group.add(l); return l; });
+  const helixLines = helixPos.map((pos, k) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const l = new THREE.Line(g, glowLineMat(k ? COLORS.sky : COLORS.gold, 1.2, 0.8)); l.frustumCulled = false; group.add(l); return l; });
   const RUNGS = Math.ceil(HS / 5), rungPos = new Float32Array(RUNGS * 6);
   const rungGeo = new THREE.BufferGeometry(); rungGeo.setAttribute('position', new THREE.BufferAttribute(rungPos, 3));
-  const rungLines = new THREE.LineSegments(rungGeo, add(COLORS.ice, 1, 0.35)); rungLines.frustumCulled = false; group.add(rungLines);
+  const rungLines = new THREE.LineSegments(rungGeo, glowLineMat(COLORS.ice, 1, 0.35)); rungLines.frustumCulled = false; group.add(rungLines);
   const helixBent = [helixPts[0].map((p) => p.clone()), helixPts[1].map((p) => p.clone())];   // this frame's world-space helix, for the sparks
   // sparks riding the helix
   const SP = 60, spos = new Float32Array(SP * 3), sparks = Array.from({ length: SP }, () => ({ t: Math.random(), k: Math.random() < 0.5 ? 0 : 1, v: rnd(0.3, 0.7) }));

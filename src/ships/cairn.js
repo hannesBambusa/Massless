@@ -15,7 +15,6 @@ export const name = 'Cairn';
 export const description = 'A column of floating stone slabs engraved with glowing glyphs. Hovers as a stack at rest, shingles into an arrowhead in flight, wheels like a mill in orbit.';
 
 const SLABS = 7;
-const lineMat = glowLineMat;
 
 /** glyph lines carved into a slab face: a few random right-angled strokes within the slab's w x h */
 function glyphs(w, h) {
@@ -42,9 +41,9 @@ export function build() {
     const carrier = new THREE.Group(), body = new THREE.Group(); carrier.add(body); group.add(carrier);
     const geo = new THREE.BoxGeometry(w, h, d);
     body.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x0a0818 })));
-    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(COLORS.lav, 0.7, 0.35)));
-    const gl = glyphs(w, h), front = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gl), lineMat(COLORS.violet, 1.4, 0.9)); front.position.z = d / 2; body.add(front);
-    const back = front.clone(); back.material = lineMat(COLORS.violet, 1.4, 0.9); back.position.z = -d / 2; back.rotation.y = Math.PI; body.add(back);
+    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), glowLineMat(COLORS.lav, 0.7, 0.35)));
+    const gl = glyphs(w, h), front = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gl), glowLineMat(COLORS.violet, 1.4, 0.9)); front.position.z = d / 2; body.add(front);
+    const back = front.clone(); back.material = glowLineMat(COLORS.violet, 1.4, 0.9); back.position.z = -d / 2; back.rotation.y = Math.PI; body.add(back);
     const gem = glowSprite(COLORS.violet, 0.9, 0.8); gem.position.set(w * 0.42, -h * 0.4, 0); body.add(gem);
     slabs.push({ carrier, body, front, back, gem, w, h, i, phase: rnd(0, TAU), turn: rnd(0.08, 0.2) * (i % 2 ? 1 : -1) });
   }
@@ -79,8 +78,7 @@ export function build() {
       const x = Math.cos(ma) * mr, y = mix(yStack, yShingle) * (1 - mill) + Math.sin(ma) * mr, z = mix(zStack, zShingle) * (1 - mill * 0.6);
       bend.place(s.carrier, x, y, z);
       // orientation inside the carrier: stack turns on Z, shingle pitches up so the slab lies almost flat along the axis, mill faces outward
-      s.body.rotation.set(mix(0, -1.15) * (1 - mill) + mill * 0, 0, (Math.sin(t * s.turn * 4 + s.phase) * 0.35 * (1 - w)) * (1 - mill) + mill * (ma + Math.PI / 2));
-      if (mill > 0.01) s.body.rotation.x = mix(0, -1.15) * (1 - mill);
+      s.body.rotation.set(mix(0, -1.15) * (1 - mill), 0, (Math.sin(t * s.turn * 4 + s.phase) * 0.35 * (1 - w)) * (1 - mill) + mill * (ma + Math.PI / 2));
       // glyphs pulse in sequence down the stack, and burn steady in flight
       const seq = 0.5 + 0.5 * Math.sin(t * 2.5 - s.i * 0.9);
       const op = mix(0.35 + 0.6 * seq, 0.9) * (0.7 + energy * 0.3);

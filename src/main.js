@@ -28,6 +28,7 @@ import { clamp, damp } from './utils.js';
 import { loadProgress, ProgressSaver } from './save.js';
 import { Loadout } from './loadout.js';
 import { Training } from './training.js';
+import { Codex } from './codex.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // retina at 2x doubles the bloom cost for little gain
@@ -88,7 +89,7 @@ game.rebase = () => {
   for (const k of ['sites', 'streams', 'rocks', 'mobs', 'rifts', 'gate', 'loot', 'stars', 'arsenal']) if (game[k] && game[k].shift) game[k].shift(d);
   ship.shift(d);
   pivot.sub(d); camera.position.sub(d);
-  game.origin.add(d);   // where the world origin is now, in absolute metres (for the position readout)
+  game.origin.add(d);   // where the world origin sits now, in absolute metres
 };
 game.origin = new THREE.Vector3();
 game.loadSystem('alpha');
@@ -98,8 +99,13 @@ game.arsenal = new Arsenal(scene, game.ship, game.mobs);
 for (const k of ["hold", "fits", "owned"]) if (!game.state[k]) game.state[k] = {};
 game.saver = new ProgressSaver(game.state);
 game.training = new Training(game);   // skills: learned boxes, paid in fragments
+game.codex = new Codex(game.state);    // the log of firsts
 game.loadout = new Loadout(game);   // fitting: shells, owned modules, derived stats
-game.loot = new Loot(scene, game.ship, (key, n) => { n *= game.ship.stats.harvestYield || 1; game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark(); });
+game.loot = new Loot(scene, game.ship, (key, n, harvested) => {
+  if (harvested) n *= game.ship.stats.harvestYield || 1;   // the Attuner's yield applies to condensates only
+  game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark();
+  game.codex.unlock(`energy.${key}`);
+});
 const { ship, selection, marker, stars } = game;
 
 /** run a command against the selected target (or stop) */
@@ -111,6 +117,7 @@ game.command = (name) => {
     ship.jumpTo(sys, () => {
       // mid-fold: swap the world under the ship; the ship then runs in along its line and stops beside the new home site
       game.loadSystem(sys.id);
+      game.codex.unlock('act.fold'); game.codex.unlock(`system.${sys.id}`);
       game.jumpTarget = null;
       game.snapCamera = true;   // the ship has moved worlds: the camera pivot must follow instantly, not lerp across
       setTimeout(() => ship.trail.reset(ship.position, ship.forward(new THREE.Vector3())), 50);
@@ -138,31 +145,7 @@ game.command = (name) => {
       if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, ship.stats.lanceRange * 0.6)); else ship.keepAtRange(t, LANCE.harvestGap);   // siphon: hold 60 m off the cloud
     }
   }
-  if (name === 'warp') { if (game.auto) game.toggleAuto(); if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
-};
-/** select obj; if the ship is busy with a target command, re-issue it against the new target */
-game.retarget = (obj) => {
-  if (!obj) return;
-  selection.set(obj);
-  const k = ship.cmd.kind;
-  if (k === 'orbit' || k === 'approach' || k === 'keep') game.command(k);
-  if (k === 'warp' && ship.cmd.phase === 'align') game.command('warp');
-};
-/** auto harvest: keep siphoning the nearest condensate until none are left in reach */
-game.auto = false;
-game.toggleAuto = () => {
-  game.auto = !game.auto;
-  if (game.auto) { game.autoNext(); ui.flash('Auto harvest on'); } else ui.flash('Auto harvest off');
-  ui.setAuto(game.auto);
-};
-game.autoNext = () => {
-  const p = ship.position;
-  let best = null, bd = Infinity;
-  for (const c of game.rocks.list) { const d = c.position.distanceTo(p); if (d < bd && d < ROCK.autoRange) { bd = d; best = c; } }
-  if (!best) { game.auto = false; ui.setAuto(false); ui.flash('Nothing left to harvest in reach'); return; }
-  selection.set(best);
-  game.lance.fire(best);
-  if (best.position.distanceTo(p) - best.radius > ship.stats.lanceRange) ship.keepAtRange(best, LANCE.harvestGap);
+  if (name === 'warp') { if (game.auto) game.toggleAuto(); if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); else game.codex.unlock('act.warp'); }
 };
 /** hull at zero: announce, then re-form at the system's home site with shield and hull whole */
 game.die = () => {
@@ -174,7 +157,7 @@ game.die = () => {
 };
 game.respawn = () => {
   ship.hull = ship.hullMax; ship.shield = ship.shieldMax;
-  ship.cmd = { kind: 'stop' };
+  ship.cmd = { kind: 'stop' }; ship.vel.set(0, 0, 0); ship.speed = 0;
   ship.position.copy(game.haven ? game.haven.spawnPoint() : game.sites.home.position.clone().add(new THREE.Vector3(0, 0, 160)));
   ship.trail.reset(ship.position, ship.forward(new THREE.Vector3()));
   game.snapCamera = true;
@@ -232,8 +215,6 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') ship.stop();
   if (e.code === 'Escape') selection.clear();
   if (!game.direct) {
-    if (e.code === 'KeyQ') game.command('approach');
-    if (e.code === 'KeyW') game.command('orbit');
     if (e.code === 'KeyE') game.command('keep');
     if (e.code === 'KeyS') game.command('warp');
     if (e.code === 'KeyF') game.command('lance');
@@ -325,11 +306,12 @@ function frame(now) {
   ship.update(dt);
   game.rocks.update(dt, (rock) => {
     if (game.auto && game.lance.target === rock) setTimeout(() => game.auto && game.autoNext(), 400);
-    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint, rock.energy.key);
+    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint, rock.energy.key, true);
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
   });
   game.mobs.update(dt, ship, (mob) => {
+    game.codex.unlock(`mob.${mob.mobKind}`);
     game.loot.burst(mob.position, 14, mob.def.scrap / 14, ENERGY_BY_KEY[mob.def.drop].color, mob.def.drop);
     if (mob.def.ash) game.loot.burst(mob.position, 6, mob.def.ash / 6, ENERGY_BY_KEY.ash.color, 'ash');
     if (selection.obj === mob) selection.clear();

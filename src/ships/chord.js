@@ -6,7 +6,7 @@
 // The frame is a rigid arc placed on the path; strings are rebuilt each frame with their waveform. Forward is -Z.
 import * as THREE from 'three';
 import { COLORS } from '../config.js';
-import { glowSprite } from '../materials.js';
+import { glowSprite, glowLineMat } from '../materials.js';
 import { TAU, rnd, damp, clamp } from '../utils.js';
 import { Bender } from './bend.js';
 
@@ -15,7 +15,8 @@ export const name = 'Chord';
 export const description = 'A bow-shaped frame with humming strings, each a standing wave on its own harmonic. Stands open like a harp at rest, draws taut into a bow in flight, runs a glissando in orbit.';
 
 const STRINGS = 9, SEG = 40;
-const lineMat = (color, mult = 1.2, opacity = 0.8) => new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(mult), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+
+const deg = (d) => d / 360 * TAU;
 
 export function build() {
   const group = new THREE.Group();
@@ -39,7 +40,7 @@ export function build() {
   // strings: SEG+1 samples each, rebuilt every frame
   const strings = anchors.map((an, i) => {
     const pos = new Float32Array((SEG + 1) * 3), geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const line = new THREE.Line(geo, lineMat(i % 3 === 1 ? COLORS.gold : COLORS.white, 1.1, 0.6)); line.frustumCulled = false; group.add(line);
+    const line = new THREE.Line(geo, glowLineMat(i % 3 === 1 ? COLORS.gold : COLORS.white, 1.1, 0.6)); line.frustumCulled = false; group.add(line);
     return { an, pos, line, harmonic: 1 + (i % 4), freq: 3 + i * 0.7, amp: 0, phase: rnd(0, TAU) };
   });
   // resonance: a soft glow at the frame centre that swells with the strings
@@ -67,7 +68,7 @@ export function build() {
     // pluck: a wandering pluck at rest, a rising run in orbit, everything ringing under thrust
     pluckT += dt * (0.6 + gliss * 2.5);
     const plucked = Math.floor(pluckT) % STRINGS;
-    for (const s of strings) { const idx = strings.indexOf(s); const hit = idx === plucked ? 1 : 0; s.amp += ((0.06 + hit * 0.35 + state.thrust * 0.25 + w * 0.1) - s.amp) * damp(hit ? 12 : 2.5, dt); }
+    for (let idx = 0; idx < strings.length; idx++) { const s = strings[idx], hit = idx === plucked ? 1 : 0; s.amp += ((0.06 + hit * 0.35 + state.thrust * 0.25 + w * 0.1) - s.amp) * damp(hit ? 12 : 2.5, dt); }
 
     // frame orientation: harp faces forward (arc in the XY plane), bow lies along the axis; orbit leans it
     qLean.setFromEuler(new THREE.Euler(0, 0, gliss * 0.4 * Math.sin(t * 0.8)));
@@ -108,4 +109,3 @@ export function build() {
   }
   return { group, engines, update };
 }
-const deg = (d) => d / 360 * TAU;

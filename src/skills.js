@@ -9,7 +9,8 @@ export const SKILL_CAP = 250;
 const TIER_COST = [15, 6, 8, 10, 12];          // novice, tier 1..4 (skill points)
 const MASTER_COST = 30;
 const TIER_FRAGS = [0, 20, 50, 120, 250];      // novice, tier 1..4 (fragments of the profession's energy)
-const MASTER_FRAGS = 500, MASTER_LUMEN = 120;
+const MASTER_FRAGS = 500;
+export const MASTER_LUMEN = 120;
 const pct = (stat, value) => ({ stat, value, isPercentage: true });
 const flat = (stat, value) => ({ stat, value, isPercentage: false });
 

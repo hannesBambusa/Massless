@@ -60,7 +60,7 @@ One HUD with three states it morphs between: **Nav** (teal, movement commands fo
 
 ## Haven
 
-You start inside your Haven (`src/haven.js`): a private pocket in Alpha Reach wrapped in a large translucent bubble, with a hearth at its centre, drifting rings, a hexagonal lattice floor and motes rising through it. It's listed as a site tagged HOME, only you can warp to it, and it's where you re-form after being unbound.
+You start inside your Haven (`src/haven.js`): a private pocket in Alpha Reach wrapped in a large translucent bubble, with a hearth at its centre, a hexagonal lattice floor and motes rising through it. It's listed as a site tagged HOME, only you can warp to it, and it's where you re-form after being unbound.
 
 ## Systems
 

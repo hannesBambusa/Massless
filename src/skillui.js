@@ -2,6 +2,7 @@
 // an experience card and an info card with learn / surrender. Reads the training manager, writes DOM.
 import { STAT_LABELS } from './fits.js';
 import { ENERGY_BY_KEY } from './config.js';
+import { MASTER_LUMEN } from './skills.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -38,7 +39,7 @@ export class SkillUI {
 
     // tree
     const cls = (b) => { const known = tr.has(b.id); const chk = known ? null : tr.check(b); return `box ${b.kind} ${known ? 'known' : chk.ok ? 'ready' : chk.code === 'prereq' ? 'locked' : ''} ${b.id === this.sel ? 'sel' : ''} t${b.tier}`; };
-    const node = (b, extra = '') => `<div class="${cls(b)} ${extra}" data-id="${b.id}" style="${extra ? '' : ''}"><span class="hexn"><i></i></span><span class="txt"><span class="nm">${b.name}</span><span class="ct">${b.cost} pts${Object.entries(b.frags).map(([k, n]) => ` · ${n} ${fam(k).name}`).join('')}</span></span></div>`;
+    const node = (b, extra = '') => `<div class="${cls(b)} ${extra}" data-id="${b.id}"><span class="hexn"><i></i></span><span class="txt"><span class="nm">${b.name}</span><span class="ct">${b.cost} pts${Object.entries(b.frags).map(([k, n]) => ` · ${n} ${fam(k).name}`).join('')}</span></span></div>`;
     let tree = '';
     const master = prof.boxes.find((b) => b.kind === 'master'), novice = prof.boxes.find((b) => b.kind === 'novice');
     tree += `<div class="sk-master">${node(master, 'big')}</div>`;
@@ -49,7 +50,13 @@ export class SkillUI {
 
     // fragments card: what the hold has of each energy a profession is paid in, against the next box that needs it
     const hold = tr.hold;
-    $('sk-xp').innerHTML = tr.professions.map((p) => { const next = p.boxes.filter((b) => !tr.has(b.id) && b.frags[p.energy]).sort((a, b) => a.frags[p.energy] - b.frags[p.energy])[0]; const have = Math.floor(hold[p.energy] || 0), need = next ? next.frags[p.energy] : 0; return `<div class="xp-row" style="--c:${hex(fam(p.energy).color)}"><span class="k">${fam(p.energy).name}</span><span class="track"><i style="--f:${need ? Math.min(1, have / need) : 1}"></i></span><span class="v">${have.toLocaleString()}${need ? ` / ${need}` : ''}</span></div>`; }).join('') + (() => { const have = Math.floor(hold.lumen || 0); return `<div class="xp-row" style="--c:${hex(fam('lumen').color)}"><span class="k">Lumen</span><span class="track"><i style="--f:${Math.min(1, have / 120)}"></i></span><span class="v">${have} / 120</span></div>`; })();
+    const xpRow = (name, color, have, need) => `<div class="xp-row" style="--c:${hex(color)}"><span class="k">${name}</span><span class="track"><i style="--f:${need ? Math.min(1, have / need) : 1}"></i></span><span class="v">${have.toLocaleString()}${need ? ` / ${need}` : ''}</span></div>`;
+    const rows = tr.professions.map((p) => {
+      const next = p.boxes.filter((b) => !tr.has(b.id) && b.frags[p.energy]).sort((a, b) => a.frags[p.energy] - b.frags[p.energy])[0];
+      return xpRow(fam(p.energy).name, fam(p.energy).color, Math.floor(hold[p.energy] || 0), next ? next.frags[p.energy] : 0);
+    });
+    rows.push(xpRow('Lumen', fam('lumen').color, Math.floor(hold.lumen || 0), MASTER_LUMEN));
+    $('sk-xp').innerHTML = rows.join('');
 
     // info card
     const box = this.sel ? tr.box(this.sel) : null;

@@ -5,10 +5,10 @@ const KEY = 'progress';
 export function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(KEY));
-    if (!p || typeof p !== 'object') return { scrap: 0, hold: {}, fits: {}, owned: {}, skills: null };
+    if (!p || typeof p !== 'object') return { scrap: 0, hold: {}, fits: {}, owned: {}, skills: null, shells: {}, codex: {} };
     const obj = (v) => v && typeof v === 'object' ? v : {};
-    return { scrap: Number.isFinite(p.scrap) ? p.scrap : 0, hold: obj(p.hold), fits: obj(p.fits), owned: obj(p.owned), skills: p.skills || null };
-  } catch { return { scrap: 0, hold: {}, fits: {}, owned: {}, skills: null }; }
+    return { scrap: Number.isFinite(p.scrap) ? p.scrap : 0, hold: obj(p.hold), fits: obj(p.fits), owned: obj(p.owned), skills: p.skills || null, shells: obj(p.shells), codex: obj(p.codex) };
+  } catch { return { scrap: 0, hold: {}, fits: {}, owned: {}, skills: null, shells: {}, codex: {} }; }
 }
 
 export class ProgressSaver {
@@ -22,7 +22,8 @@ export class ProgressSaver {
   flush() {
     if (!this.dirty) return;
     this.dirty = false; this.timer = this.interval;
-    try { localStorage.setItem(KEY, JSON.stringify({ scrap: this.state.scrap, hold: this.state.hold, fits: this.state.fits, owned: this.state.owned, skills: this.state.skills })); } catch { /* storage blocked */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ scrap: this.state.scrap, hold: this.state.hold, fits: this.state.fits, owned: this.state.owned, skills: this.state.skills, shells: this.state.shells, codex: this.state.codex })); } catch { /* storage blocked */ }
   }
-  reset() { this.state.scrap = 0; this.state.hold = {}; this.state.fits = {}; this.state.owned = {}; this.state.skills = null; this.dirty = true; this.flush(); }
+  /** wipe progress. onReset lets owners of cached state (Training) re-read it */
+  reset(onReset) { this.state.scrap = 0; this.state.hold = {}; this.state.fits = {}; this.state.owned = {}; this.state.skills = null; if (onReset) onReset(); this.dirty = true; this.flush(); }
 }

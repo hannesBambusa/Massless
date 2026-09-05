@@ -5,21 +5,22 @@
 import { SHIP, LANCE, WORLD } from './config.js';
 
 const BASE = { integrity: SHIP.hull, shield: SHIP.shield, shieldRegen: SHIP.shieldRegen, maxSpeed: SHIP.maxSpeed, lanceDps: LANCE.dps, lanceRange: LANCE.range, lockTime: LANCE.lockTime, overviewRange: WORLD.overviewRange, harvestYield: 1 };
-const shell = (id, luminosity, coherence, corona, orbit, core, base = {}) => ({ id, luminosity, coherence, slots: { corona, orbit, core }, base: { ...BASE, ...base } });
+/** unlock: null = free; { frags: {energy: n} } = bound with fragments; { tag } = granted by a skill box (a master, usually) */
+const shell = (id, luminosity, coherence, corona, orbit, core, base = {}, unlock = null) => ({ id, luminosity, coherence, slots: { corona, orbit, core }, base: { ...BASE, ...base }, unlock });
 
 /** one shell per vessel design; the design you fly is the shell you fit */
 export const SHELLS = {
   bloom:  shell('bloom',  100, 100, 2, 3, 2),
   prism:  shell('prism',  130,  90, 3, 2, 2, { lanceDps: LANCE.dps * 1.1, maxSpeed: SHIP.maxSpeed * 0.95 }),
-  shoal:  shell('shoal',   90, 130, 2, 2, 3, { overviewRange: WORLD.overviewRange * 1.3 }),
-  kite:   shell('kite',    90, 110, 1, 4, 2, { maxSpeed: SHIP.maxSpeed * 1.15, integrity: SHIP.hull * 0.85 }),
-  gyre:   shell('gyre',   120, 120, 2, 2, 2, { shieldRegen: SHIP.shieldRegen * 1.3 }),
-  ember:  shell('ember',  150,  80, 3, 1, 3, { lanceDps: LANCE.dps * 1.2, shield: SHIP.shield * 0.8 }),
-  loom:   shell('loom',   100, 140, 1, 3, 3, { lockTime: LANCE.lockTime * 0.8 }),
-  medusa: shell('medusa', 110, 110, 1, 3, 3, { shield: SHIP.shield * 1.3, maxSpeed: SHIP.maxSpeed * 0.9 }),
-  cairn:  shell('cairn',  140, 100, 2, 2, 3, { integrity: SHIP.hull * 1.4, maxSpeed: SHIP.maxSpeed * 0.85 }),
-  chord:  shell('chord',  100, 150, 3, 3, 1, { lockTime: LANCE.lockTime * 0.7, lanceRange: LANCE.range * 1.15 }),
-  nautilus: shell('nautilus', 120, 110, 1, 2, 4, { shieldRegen: SHIP.shieldRegen * 1.5, shield: SHIP.shield * 1.1 }),
+  shoal:  shell('shoal',   90, 130, 2, 2, 3, { overviewRange: WORLD.overviewRange * 1.3 }, { frags: { glacis: 120, cerule: 80 } }),
+  kite:   shell('kite',    90, 110, 1, 4, 2, { maxSpeed: SHIP.maxSpeed * 1.15, integrity: SHIP.hull * 0.85 }, { frags: { cerule: 150, sol: 60 } }),
+  gyre:   shell('gyre',   120, 120, 2, 2, 2, { shieldRegen: SHIP.shieldRegen * 1.3 }, { tag: 'master-wayfarer' }),
+  ember:  shell('ember',  150,  80, 3, 1, 3, { lanceDps: LANCE.dps * 1.2, shield: SHIP.shield * 0.8 }, { frags: { ember: 200, ash: 60 } }),
+  loom:   shell('loom',   100, 140, 1, 3, 3, { lockTime: LANCE.lockTime * 0.8 }, { frags: { lumen: 80, sol: 120 } }),
+  medusa: shell('medusa', 110, 110, 1, 3, 3, { shield: SHIP.shield * 1.3, maxSpeed: SHIP.maxSpeed * 0.9 }, { frags: { glacis: 200, lumen: 40 } }),
+  cairn:  shell('cairn',  140, 100, 2, 2, 3, { integrity: SHIP.hull * 1.4, maxSpeed: SHIP.maxSpeed * 0.85 }, { frags: { ember: 150, glacis: 150 } }),
+  chord:  shell('chord',  100, 150, 3, 3, 1, { lockTime: LANCE.lockTime * 0.7, lanceRange: LANCE.range * 1.15 }, { tag: 'master-lancer' }),
+  nautilus: shell('nautilus', 120, 110, 1, 2, 4, { shieldRegen: SHIP.shieldRegen * 1.5, shield: SHIP.shield * 1.1 }, { tag: 'master-attuner' }),
 };
 
 const flat = (stat, value) => ({ stat, value, isPercentage: false });

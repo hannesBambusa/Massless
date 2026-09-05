@@ -6,13 +6,14 @@ export class Training {
   constructor(game) {
     this.game = game;
     game.state.skills = normalizeSkills(game.state.skills);
-    this.s = game.state.skills;
     this.listeners = new Set();
   }
+  /** always the live skills object, so a save reset is seen immediately */
+  get s() { if (!this.game.state.skills) this.game.state.skills = normalizeSkills(null); return this.game.state.skills; }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   changed() { if (this.game.saver) this.game.saver.mark(); if (this.game.loadout) this.game.loadout.apply(); for (const fn of this.listeners) fn(); }
   get hold() { return this.game.state.hold; }
-  learn(box) { const r = learn(this.s, box, this.hold); if (r.ok) this.changed(); return r; }
+  learn(box) { const r = learn(this.s, box, this.hold); if (r.ok) { this.changed(); if (box.kind === 'master' && this.game.codex) this.game.codex.unlock(`master.${box.prof}`); } return r; }
   surrender(box) { const r = surrender(this.s, box); if (r.ok) this.changed(); return r; }
   check(box) { return canLearn(this.s, box, this.hold); }
   checkSurrender(box) { return canSurrender(this.s, box); }

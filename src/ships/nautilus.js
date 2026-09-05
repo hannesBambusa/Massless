@@ -6,7 +6,7 @@
 // The ribbon is a strip mesh rebuilt each frame from the spiral parameters. Forward is -Z.
 import * as THREE from 'three';
 import { COLORS } from '../config.js';
-import { glowSprite } from '../materials.js';
+import { glowSprite, glowLineMat } from '../materials.js';
 import { TAU, rnd, damp, clamp } from '../utils.js';
 import { Bender } from './bend.js';
 
@@ -29,10 +29,10 @@ export function build() {
   const ribbon = new THREE.Mesh(rgeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.32, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); ribbon.frustumCulled = false; group.add(ribbon);
   // edges: bright lines along both ribbon edges
   const edgeGeo = [0, 1].map(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); return g; });
-  const edges = edgeGeo.map((g, k) => { const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(k ? COLORS.green : PEARL).multiplyScalar(1.2), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); l.frustumCulled = false; group.add(l); return l; });
+  const edges = edgeGeo.map((g, k) => { const l = new THREE.Line(g, glowLineMat(k ? COLORS.green : PEARL, 1.2, 0.85)); l.frustumCulled = false; group.add(l); return l; });
   // septa: chamber walls across the ribbon at intervals
   const spos = new Float32Array(SEPTA * 6), sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
-  const septa = new THREE.LineSegments(sgeo, new THREE.LineBasicMaterial({ color: ROSE, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); septa.frustumCulled = false; group.add(septa);
+  const septa = new THREE.LineSegments(sgeo, glowLineMat(ROSE, 1, 0.5)); septa.frustumCulled = false; group.add(septa);
   // chamber lights: one glow per chamber, lit in sequence
   const chambers = Array.from({ length: SEPTA }, () => { const g = glowSprite(ROSE, 0.9, 0.5); group.add(g); return g; });
 

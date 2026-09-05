@@ -7,7 +7,6 @@ import { glowSprite, glowLineMat } from './materials.js';
 import { rnd, damp, clamp, TAU, pick } from './utils.js';
 
 const SAMPLES = 16;
-const add = glowLineMat;
 const MAX_BOLTS = 80;
 
 export class Mobs {
@@ -16,12 +15,12 @@ export class Mobs {
     this.scene = scene;
     this.group = new THREE.Group(); scene.add(this.group);
     this.list = []; this.count = 0;
-    this._d = new THREE.Vector3(); this._tmp = new THREE.Vector3();
+    this._d = new THREE.Vector3(); this._tmp = new THREE.Vector3(); this._want = new THREE.Vector3(); this._jink = new THREE.Vector3();
     // bolts: one LineSegments buffer for every tracer in flight
     this.bolts = [];
     this.boltPos = new Float32Array(MAX_BOLTS * 6);
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(this.boltPos, 3)); this.boltGeo = bg;
-    this.boltLines = new THREE.LineSegments(bg, add(0x60a5fa, 1.6, 0.95)); this.boltLines.frustumCulled = false; scene.add(this.boltLines);
+    this.boltLines = new THREE.LineSegments(bg, glowLineMat(MOB_TYPES.shade.bolt.color, 1.6, 0.95)); this.boltLines.frustumCulled = false; scene.add(this.boltLines);
     for (const st of sites) this.populate(st);
   }
   dispose() { this.scene.remove(this.group); this.scene.remove(this.boltLines); this.list = []; this.bolts = []; }
@@ -57,7 +56,7 @@ export class Mobs {
     g.tendrils = [];
     for (let i = 0; i < n; i++) {
       const pos = new Float32Array(SAMPLES * 3), geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const line = new THREE.Line(geo, add(i % 2 ? color1 : color2, 1.2, 0.8)); line.frustumCulled = false; g.add(line);
+      const line = new THREE.Line(geo, glowLineMat(i % 2 ? color1 : color2, 1.2, 0.8)); line.frustumCulled = false; g.add(line);
       g.tendrils.push({ pos, line, a: i / n * TAU, b: rnd(-0.8, 0.8), len: len * rnd(0.8, 1.2), sp: rnd(1.5, 3), ph: rnd(0, TAU), curve: new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]) });
     }
   }
@@ -70,7 +69,7 @@ export class Mobs {
   build_shade(g) {
     // a flat dark disc seen edge-on, a single cold eye, two long trailing filaments
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.25, 24), new THREE.MeshBasicMaterial({ color: 0x050a1c })); g.add(disc); g.disc = disc;
-    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(disc.geometry, 30), add(0x60a5fa, 1.4, 0.7)));
+    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(disc.geometry, 30), glowLineMat(0x60a5fa, 1.4, 0.7)));
     g.glow = glowSprite(0x60a5fa, 5, 0.4); g.add(g.glow);
     g.eye = glowSprite(COLORS.white, 1.6, 1); g.add(g.eye);
     this.tendrils(g, 2, 0x60a5fa, 0x9be7ff, 7);
@@ -78,14 +77,14 @@ export class Mobs {
   build_maw(g) {
     // a ring of teeth: a spiky torus around a hot core, slowly rotating, opening as it bites
     const teeth = new THREE.Mesh(new THREE.TorusGeometry(5, 1.4, 5, 14), new THREE.MeshBasicMaterial({ color: 0x1a0a04 })); g.add(teeth); g.teeth = teeth;
-    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(teeth.geometry, 20), add(0xffb347, 1.4, 0.8)));
+    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(teeth.geometry, 20), glowLineMat(0xffb347, 1.4, 0.8)));
     const core = new THREE.Mesh(new THREE.SphereGeometry(2.2, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff9f43).multiplyScalar(0.9) })); g.add(core); g.core = core;
     g.glow = glowSprite(0xff9f43, 12, 0.5); g.add(g.glow);
     this.tendrils(g, 5, 0xff9f43, 0xff3d7a, 3);
   }
   build_shoal(g) {
     // a tiny wireframe tetrahedron with a short tail, cold blue-white
-    const tet = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.TetrahedronGeometry(1.6, 0)), add(0x9be7ff, 1.5, 0.9)); g.add(tet); g.tet = tet;
+    const tet = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.TetrahedronGeometry(1.6, 0)), glowLineMat(0x9be7ff, 1.5, 0.9)); g.add(tet); g.tet = tet;
     g.glow = glowSprite(0x9be7ff, 2.6, 0.5); g.add(g.glow);
     this.tendrils(g, 1, 0x9be7ff, 0x9be7ff, 3);
   }
@@ -104,8 +103,8 @@ export class Mobs {
         // close to hold range; shades hang back and strafe, shoals jink
         const side = this._tmp.set(-toShip.z, 0, toShip.x).normalize();
         let want;
-        if (d > def.hold * 1.15) want = toShip.clone().normalize().multiplyScalar(def.speed);
-        else if (d < def.hold * 0.85) want = toShip.clone().normalize().multiplyScalar(-def.speed * 0.7);
+        if (d > def.hold * 1.15) want = this._want.copy(toShip).normalize().multiplyScalar(def.speed);
+        else if (d < def.hold * 0.85) want = this._want.copy(toShip).normalize().multiplyScalar(-def.speed * 0.7);
         else want = side.multiplyScalar(def.speed * (m.mobKind === 'shade' ? 0.9 : 0.7) * (Math.sin(m.t * 0.7 + m.phase) > 0 ? 1 : -1));
         if (m.mobKind === 'shoal') want.add(new THREE.Vector3(Math.sin(m.t * 6 + m.phase), Math.cos(m.t * 5 + m.phase) * 0.5, Math.cos(m.t * 6.5 + m.phase)).multiplyScalar(18));
         m.vel.lerp(want, damp(m.mobKind === 'maw' ? 0.7 : 1.4, dt));
@@ -157,11 +156,11 @@ export class Mobs {
       if (d < 4) { ship.damage(b.dmg); this.bolts.splice(i, 1); continue; }
       if (b.life <= 0) { this.bolts.splice(i, 1); continue; }
     }
-    for (let i = 0; i < MAX_BOLTS; i++) {
-      const b = this.bolts[i];
-      if (b) { const t = b.v.clone().normalize().multiplyScalar(-b.len); this.boltPos.set([b.p.x, b.p.y, b.p.z, b.p.x + t.x, b.p.y + t.y, b.p.z + t.z], i * 6); }
-      else this.boltPos.set([0, -1e6, 0, 0, -1e6, 0], i * 6);
+    for (let i = 0; i < this.bolts.length; i++) {
+      const b = this.bolts[i], t = this._tmp.copy(b.v).normalize().multiplyScalar(-b.len);
+      this.boltPos.set([b.p.x, b.p.y, b.p.z, b.p.x + t.x, b.p.y + t.y, b.p.z + t.z], i * 6);
     }
+    this.boltGeo.setDrawRange(0, this.bolts.length * 2);   // only the bolts in flight are drawn
     this.boltGeo.attributes.position.needsUpdate = true;
   }
 }

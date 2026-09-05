@@ -7,7 +7,6 @@ import { COLORS, WEAPONS } from '../config.js';
 import { glowSprite, glowLineMat } from '../materials.js';
 import { rnd, TAU, clamp } from '../utils.js';
 
-const add = glowLineMat;
 const ring = (r, mat) => { const pts = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * TAU; pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)); } const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat); l.frustumCulled = false; return l; };
 
 export class Arsenal {
@@ -45,7 +44,7 @@ export class Arsenal {
     }
     // three rings expand out from the ship, tilted like the vessel's halo
     for (let i = 0; i < 3; i++) {
-      const r = ring(1, add(i ? COLORS.ice : COLORS.cyan, 1.6, 0.9)); r.rotation.set(rnd(-0.5, 0.5), rnd(0, TAU), rnd(-0.5, 0.5));
+      const r = ring(1, glowLineMat(i ? COLORS.ice : COLORS.cyan, 1.6, 0.9)); r.rotation.set(rnd(-0.5, 0.5), rnd(0, TAU), rnd(-0.5, 0.5));
       this.group.add(r); this.effects.push({ kind: 'ring', obj: r, t: -i * 0.08, life: 0.7, range: w.range });
     }
     const flash = glowSprite(COLORS.white, 6, 0.9); this.group.add(flash); this.effects.push({ kind: 'flash', obj: flash, t: 0, life: 0.35 });
@@ -56,7 +55,7 @@ export class Arsenal {
     this.cd.filament = w.cooldown;
     // a strand that flies out, wraps the target and drains it: damage over time, a share of it knits our shield
     const pos = new Float32Array(30 * 3), geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const line = new THREE.Line(geo, add(COLORS.violet, 1.5, 0.95)); line.frustumCulled = false; this.group.add(line);
+    const line = new THREE.Line(geo, glowLineMat(COLORS.violet, 1.5, 0.95)); line.frustumCulled = false; this.group.add(line);
     const ship = this.ship;
     const fx = { kind: 'filament', obj: line, pos, target, t: 0, life: w.duration + 0.5, fly: 0.45, phase: rnd(0, TAU) };
     target.dots.push({ dps: w.dps * (target.def.resist.filament ?? 1), left: w.duration, key: 'filament', onTick: (n) => { ship.shield = Math.min(ship.shieldMax, ship.shield + n * w.leech); } });
@@ -69,7 +68,7 @@ export class Arsenal {
     this.cd.fracture = w.cooldown;
     this.ship.hull = Math.max(1, this.ship.hull - w.hullCost);
     // a spinning wireframe shard flies to the target and shatters it
-    const shard = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1.2, 0)), add(COLORS.gold, 1.8, 1)); shard.frustumCulled = false;
+    const shard = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1.2, 0)), glowLineMat(COLORS.gold, 1.8, 1)); shard.frustumCulled = false;
     shard.position.copy(this.ship.position); this.group.add(shard);
     this.effects.push({ kind: 'shard', obj: shard, target, t: 0, life: 2, speed: w.speed, dmg: w.dmg, spin: new THREE.Vector3(rnd(-8, 8), rnd(-8, 8), rnd(-8, 8)) });
     return null;
@@ -119,7 +118,7 @@ export class Arsenal {
       if (e.t >= e.life) { this.group.remove(e.obj); this.effects.splice(i, 1); }
     }
   }
-  shift(d) { for (const e of this.effects) if (e.kind === 'shard') e.obj.position.sub(d); }
+  shift(d) { for (const e of this.effects) if (e.kind === 'shard' || e.kind === 'flashAt') e.obj.position.sub(d); }
   /** drop every effect in flight, for a system swap */
   reset() { for (const e of this.effects) this.group.remove(e.obj); this.effects = []; }
 }

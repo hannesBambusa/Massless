@@ -20,11 +20,11 @@ export class Loot {
   }
   /** release n motes at p, each worth `value` scrap */
   /** key: which energy this is (inventory slot) */
-  burst(p, n, value, color = COLORS.gold, key = 'sol') {
+  burst(p, n, value, color = COLORS.gold, key = 'sol', harvested = false) {
     const c = new THREE.Color(color);
     for (let i = 0; i < n && this.items.length < MAX; i++) {
       const v = new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(4, 14));
-      this.items.push({ p: p.clone(), v, age: 0, value, key, c: c.clone().multiplyScalar(rnd(0.8, 1.6)) });
+      this.items.push({ p: p.clone(), v, age: 0, value, key, harvested, c: c.clone().multiplyScalar(rnd(0.8, 1.6)) });
     }
   }
   /** floating origin */
@@ -38,11 +38,11 @@ export class Loot {
         this._d.copy(ship).sub(it.p); const d = this._d.length(); this._d.normalize();
         it.v.addScaledVector(this._d, (30 + it.age * 40) * dt);
         it.v.multiplyScalar(Math.max(0, 1 - 1.5 * dt));
-        if (d < 3 + this.ship.speed * 0.05) { gained[it.key] = (gained[it.key] || 0) + it.value; this.items.splice(i, 1); continue; }
+        if (d < 3 + this.ship.speed * 0.05) { const k = it.key + (it.harvested ? ':h' : ''); gained[k] = (gained[k] || 0) + it.value; this.items.splice(i, 1); continue; }
       }
       it.p.addScaledVector(it.v, dt);
     }
-    for (const k in gained) this.onCollect(k, gained[k]);
+    for (const k in gained) { const [key, h] = k.split(':'); this.onCollect(key, gained[k], h === 'h'); }
     for (let i = 0; i < MAX; i++) {
       const it = this.items[i];
       if (it) { this.pos.set([it.p.x, it.p.y, it.p.z], i * 3); this.col.set([it.c.r, it.c.g, it.c.b], i * 3); }
