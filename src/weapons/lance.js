@@ -42,7 +42,7 @@ export class Lance {
   toggle(target) { if (this.on && this.target === target) this.stop(); else this.fire(target); }
   fire(target) { if (!target || !target.hp) return false; if (this.target !== target) this.lock = 0; this.target = target; this.on = true; return true; }
   stop() { this.on = false; }
-  get inRange() { return this.target && this.target.position.distanceTo(this.ship.position) - this.target.radius <= LANCE.range; }
+  get inRange() { return this.target && this.target.position.distanceTo(this.ship.position) - this.target.radius <= this.ship.stats.lanceRange; }
   /** what this weapon is called against the current target: a siphon on a condensate, a lance on anything else */
   get label() { return this.target && this.target.kind === 'cloud' ? 'Siphon' : 'Lance'; }
   describe() { if (!this.on || !this.target) return ''; const n = this.label; return this.inRange ? (this.lock < 1 ? `Tuning ${n.toLowerCase()} to ${this.target.name} ${Math.round(this.lock * 100)}%` : `${n} locked on ${this.target.name}`) : `${this.target.name} out of ${n.toLowerCase()} range`; }
@@ -51,8 +51,8 @@ export class Lance {
     this.t += dt;
     if (this.on && this.target && (this.target.dead || !this.target.hp)) { this.on = false; this.target = null; }
     const active = this.on && this.target && this.inRange;
-    this.lock = clamp(this.lock + (active ? dt / LANCE.lockTime : -dt / LANCE.lockDecay), 0, 1);
-    if (active) this.target.hit(LANCE.dps * (0.15 + 0.85 * this.lock * this.lock) * dt, this.lock);
+    this.lock = clamp(this.lock + (active ? dt / this.ship.stats.lockTime : -dt / LANCE.lockDecay), 0, 1);
+    if (active) this.target.hit(this.ship.stats.lanceDps * (0.15 + 0.85 * this.lock * this.lock) * dt, this.lock);
     const show = this.on && this.target && this.lock > 0.02;
     this.group.visible = !!show;
     if (!show) return;

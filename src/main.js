@@ -6,14 +6,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FoldPass } from './foldpass.js';
-import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP, WORLD } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
 import { Streams } from './streams.js';
 import { Sites } from './sites.js';
 import { Rifts } from './rift.js';
-import { SYSTEMS, systemById, lyBetween } from './systems.js';
+import { SYSTEMS, systemById, lyBetween, AU } from './systems.js';
 import { Gate } from './gate.js';
 import { Lance } from './weapons/lance.js';
 import { Loot } from './loot.js';
@@ -24,6 +24,7 @@ import { UI } from './ui.js';
 import { keys, bindPointer } from './input.js';
 import { clamp, damp } from './utils.js';
 import { loadProgress, ProgressSaver } from './save.js';
+import { Loadout } from './loadout.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // retina at 2x doubles the bloom cost for little gain
@@ -33,8 +34,8 @@ host.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.bg);
-scene.fog = new THREE.FogExp2(COLORS.bg, 0.0005);
-const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight, 0.1, 14000);
+scene.fog = new THREE.FogExp2(COLORS.bg, 0.00025);
+const camera = new THREE.PerspectiveCamera(CAMERA.fov, innerWidth / innerHeight, 0.1, 30000);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -53,7 +54,7 @@ const rim = new THREE.DirectionalLight(0x4ff2ff, 1.2); rim.position.set(30, -10,
 
 
 const game = {
-  scene, camera, state: { scrap: 0 }, direct: false,
+  scene, camera, state: loadProgress(), direct: false,   // scrap, hold, fits, owned restored from localStorage
   ship: new Ship(scene), stars: new Starfield(scene), marker: new Marker(scene),
   system: null, sites: null, streams: null, rocks: null, mobs: null, rifts: null,
 };
@@ -69,15 +70,27 @@ game.loadSystem = (id) => {
   game.mobs = new Mobs(scene, game.sites.list);
   game.rifts = new Rifts(scene, combat);
   game.gate = new Gate(scene, sys.gate);
+  game.origin.set(0, 0, 0);
   game.sites.list.push(game.gate.group);   // the gate is a site: listed, selectable, warpable
   game.stars.setNebula(sys.nebula, sys.star);
   document.getElementById('hud-sector').textContent = sys.name;
 };
+/** floating origin: shift the whole world so the ship sits at the origin again. Keeps float precision at any distance. */
+game.rebase = () => {
+  const d = ship.position.clone();
+  if (d.lengthSq() < WORLD.rebaseAt * WORLD.rebaseAt) return;
+  for (const k of ['sites', 'streams', 'rocks', 'mobs', 'rifts', 'gate', 'loot', 'stars']) if (game[k] && game[k].shift) game[k].shift(d);
+  ship.shift(d);
+  pivot.sub(d); camera.position.sub(d);
+  game.origin.add(d);   // where the world origin is now, in absolute metres (for the position readout)
+};
+game.origin = new THREE.Vector3();
 game.loadSystem('alpha');
 game.selection = new Selection(scene, camera);
 game.lance = new Lance(scene, game.ship);
+for (const k of ["hold", "fits", "owned"]) if (!game.state[k]) game.state[k] = {};
 game.saver = new ProgressSaver(game.state);
-if (!game.state.hold) game.state.hold = {};   // collected energy by key
+game.loadout = new Loadout(game);   // fitting: shells, owned modules, derived stats
 game.loot = new Loot(scene, game.ship, (key, n) => { game.state.hold[key] = (game.state.hold[key] || 0) + n; game.state.scrap += n; game.saver.mark(); });
 const { ship, selection, marker, stars } = game;
 
@@ -107,8 +120,8 @@ game.command = (name) => {
     if (!t.hp) return ui.flash('Nothing to unbind there');
     game.lance.toggle(t);
     // out of range: the ship closes in on its own. Wisps get an orbit inside lance range, condensates an approach
-    if (game.lance.on && t.position.distanceTo(ship.position) - t.radius > LANCE.range) {
-      if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, LANCE.range * 0.6)); else ship.keepAtRange(t, LANCE.harvestGap);   // siphon: hold 60 m off the cloud
+    if (game.lance.on && t.position.distanceTo(ship.position) - t.radius > ship.stats.lanceRange) {
+      if (t.kind === 'mob') ship.orbit(t, Math.min(ship.range, ship.stats.lanceRange * 0.6)); else ship.keepAtRange(t, LANCE.harvestGap);   // siphon: hold 60 m off the cloud
     }
   }
   if (name === 'warp') { if (game.auto) game.toggleAuto(); if (!ship.warpTo(t)) ui.flash(`Too close to warp. Targets need to be ${WARP.minDist} m away`); }
@@ -135,7 +148,7 @@ game.autoNext = () => {
   if (!best) { game.auto = false; ui.setAuto(false); ui.flash('Nothing left to harvest in reach'); return; }
   selection.set(best);
   game.lance.fire(best);
-  if (best.position.distanceTo(p) - best.radius > LANCE.range) ship.keepAtRange(best, LANCE.harvestGap);
+  if (best.position.distanceTo(p) - best.radius > ship.stats.lanceRange) ship.keepAtRange(best, LANCE.harvestGap);
 };
 game.toggleMode = () => {
   game.direct = !game.direct;
@@ -144,6 +157,7 @@ game.toggleMode = () => {
 };
 ship.position.copy(game.sites.home.position).add(new THREE.Vector3(0, 0, 160));   // start a little off the home beacon
 const ui = new UI(game);
+game.overlayOpen = () => ui.fitting.open || ui.settings.open;
 ui.setMode(false);
 
 // pointer: click selects, double-click in space flies that way, drag orbits the camera, wheel zooms
@@ -180,7 +194,7 @@ bindPointer(host, {
   onWheel(dy) { if (ship.cmd.kind === 'warp' || ship.cmd.kind === 'jump') return; zoom = clamp(zoom * (dy > 0 ? 1.1 : 0.9), CAMERA.zoom[0], CAMERA.zoom[1]); if (savedZoom !== null) savedZoom = null; },
 });
 window.addEventListener('keydown', (e) => {
-  if (e.target !== document.body) return;
+  if (e.target !== document.body || game.overlayOpen()) return;
   if (e.code === 'KeyV') game.toggleMode();
   if (e.code === 'KeyC') game.toggleTrack();
   if (e.code === 'Space') ship.stop();
@@ -212,8 +226,8 @@ const pivot = new THREE.Vector3(), camTarget = new THREE.Vector3(), tmp = new TH
 camera.position.set(0, 10, 30);
 function updateCamera(dt) {
   if (game.snapCamera) { pivot.copy(ship.position); game.snapCamera = false; }
-  if (ship.cmd.kind === 'jump') pivot.copy(ship.position);   // through a fold the pivot stays glued to the ship
-  else pivot.lerp(ship.position, damp(CAMERA.lerp + ship.warpW * 80, dt));   // at warp speed the pivot must stay close
+  if (ship.cmd.kind === 'jump' || ship.warping) pivot.copy(ship.position);   // through a fold or a warp the pivot stays glued to the ship: at AU/s any lag is millions of km
+  else pivot.lerp(ship.position, damp(CAMERA.lerp, dt));
   if (game.direct) {
     const c = CAMERA.chase; ship.forward(tmp); tmp.y = 0; tmp.normalize();
     camTarget.copy(ship.position).addScaledVector(tmp, -c.back * zoom); camTarget.y += c.up * zoom;
@@ -224,7 +238,9 @@ function updateCamera(dt) {
   const d = CAMERA.dist * zoom;
   // warp: swing in behind the ship and look down the line it will travel; animated over the align phase.
   // Also zoom in close so the tunnel streaks fill the screen, remembering the player's zoom to restore on drop-out.
-  if (ship.cmd.kind === 'warp' || ship.cmd.kind === 'jump') {
+  // short warps keep the player's camera; long ones and folds swing in behind the ship and zoom for the show
+  const shortWarp = ship.cmd.kind === 'warp' && ship.cmd.obj && ship.cmd.obj.position.distanceTo(ship.position) < WARP.cinematicFrom && ship.cmd.startDist < WARP.cinematicFrom;
+  if ((ship.cmd.kind === 'warp' && !shortWarp) || ship.cmd.kind === 'jump') {
     if (savedZoom === null) savedZoom = zoom;
     zoom += (CAMERA.warpZoom - zoom) * damp(CAMERA.warpLerp, dt);
     ship.forward(tmp);
@@ -236,7 +252,7 @@ function updateCamera(dt) {
     zoom += (savedZoom - zoom) * damp(2.2, dt);   // ease back to what the player had
     if (Math.abs(zoom - savedZoom) < 0.01) { zoom = savedZoom; savedZoom = null; }
   }
-  if (ship.cmd.kind !== 'warp' && ship.cmd.kind !== 'jump' && game.tracking && selection.obj) {
+  if ((ship.cmd.kind !== 'warp' || shortWarp) && ship.cmd.kind !== 'jump' && game.tracking && selection.obj) {
   // tracking: swing the orbit so the camera sits on the far side of the ship from the target and looks across at it
     tmp.copy(selection.obj.position).sub(pivot);
     const wantYaw = Math.atan2(-tmp.x, -tmp.z);
@@ -268,6 +284,7 @@ window.addEventListener('resize', () => {
 let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  game.rebase();
   if (game.direct) updateDirect();
   ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);

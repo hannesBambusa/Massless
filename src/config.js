@@ -28,15 +28,17 @@ export const SHIP = {
 };
 
 export const WARP = {
-  speed: 14000,        // units/s in full warp (~0.56 AU/s)
+  speed: 4.5e11,       // m/s in full warp: 3 AU/s, frigate-class
   minDist: 150,        // targets closer than this cannot be warped to
   alignSpeed: 0.75,    // fraction of max speed needed to enter warp (EVE)
   alignAngle: 0.08,    // radians off the target still counted as aligned
-  accel: 1.3,          // per-second rate the warp speed closes on its target
-  brake: 1.5,          // per-second rate while slowing down
+  accel: 1.6,          // per-second rate the warp speed closes on its target
+  brakeDist: 3e11,     // m: braking begins this far out (2 AU); the curve lands in ~7 s
+  visualEnd: 2e6,      // m: the tunnel and stretch drop out over the last 2,000 km
   stopAt: 70,          // drop out this far from the target (outside its radius)
   exitSpeed: 0.5,      // fraction of max speed the ship keeps on drop-out
   fov: 26,             // extra camera fov at full warp
+  cinematicFrom: 1e7,      // warps shorter than this (10,000 km) keep the player's camera and zoom
   stretch: 4,          // how far the vessel stretches along its axis at full warp
 };
 
@@ -52,15 +54,16 @@ export const WORLD = {
   stars: [3000, 1800, 900],   // stars per parallax layer, far to near
   starRadius: [900, 500, 250],
   streams: 4,          // helical energy streams per harvest site
-  overviewRange: 400,  // rocks listed in the overview (sites are always listed)
-  auUnits: 25000,      // world units per AU for the HUD: m below 1 km, km below 10 km, AU beyond
+  overviewRange: 100000,   // reach of the attunement: condensates and wisps this close are listed (sites always are)
+  auUnits: 1.496e11,   // metres per AU. The world is real metres: m below 10 km, km below 10,000 km, AU beyond
+  rebaseAt: 20000,     // floating origin: when the ship is this far from the origin, the world is shifted back under it
   hudGrid: 20,         // invisible screen grid (px) that resizable HUD panels snap to
   overviewMin: [200, 120], // smallest overview panel [w, h] in px
 };
 
 export const CAMERA = {
   dist: 30,            // orbit distance at zoom 1
-  zoom: [0.4, 40],     // wheel zoom range (40 = 1200 units out)
+  zoom: [0.4, 160],    // wheel zoom range (160 = 4800 units out)
   pitch0: 0.42,        // starting elevation (rad above the horizon)
   pitchRange: [-1.2, 1.45],
   orbitSpeed: 0.006,   // rad per dragged pixel

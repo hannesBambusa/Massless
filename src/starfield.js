@@ -39,6 +39,9 @@ export class Starfield {
     scene.add(this.group);
   }
 
+  /** floating origin: the nebula drift memory moves with the world */
+  shift(d) { for (const n of this.nebulas) if (n.userData.last) n.userData.last.sub(d); }
+
   /** recolour the sky for a system: nebula sprites take the system's nebula colour, one of them the star colour */
   setNebula(nebula, star) { this.nebulas.forEach((n, i) => n.material.color.set(i === 3 ? star : nebula)); }
 

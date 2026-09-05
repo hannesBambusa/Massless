@@ -7,6 +7,7 @@ import { HudFx, setHudDt } from './hudfx.js';
 import { SYSTEMS, lyBetween } from './systems.js';
 import { ResizablePanel } from './panel.js';
 import { Settings } from './settings.js';
+import { FitUI } from './fitui.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -27,6 +28,7 @@ export class UI {
     this.overviewTimer = 0;
     this.overviewPanel = new ResizablePanel($('overview'));
     this.settings = new Settings();
+    this.fitting = new FitUI(game, (msg) => this.flash(msg));
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyH') el.help.hidden = !el.help.hidden; });
     for (const b of document.querySelectorAll('[data-cmd]')) b.addEventListener('click', () => game.command(b.dataset.cmd));
     for (const r of SHIP.ranges) {
@@ -94,7 +96,7 @@ export class UI {
   }
   /** a large centred announcement that fades in, holds, and fades out */
   announce(title, sub) {
-    const a = el.announce; a.querySelector('.an-title').textContent = title; a.querySelector('.an-sub').textContent = sub || '';
+    const a = document.getElementById('announce'); a.querySelector('.an-title').textContent = title; a.querySelector('.an-sub').textContent = sub || '';
     a.classList.remove('on'); void a.offsetWidth; a.classList.add('on');
     clearTimeout(this.announceT); this.announceT = setTimeout(() => a.classList.remove('on'), 4200);
   }
@@ -136,7 +138,7 @@ export class UI {
     setHudDt(dt);
     el.speed.textContent = Math.round(ship.speed);
     const p = ship.position;
-    el.pos.textContent = `${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)}`;
+    const o = this.game.origin; el.pos.textContent = fmtDist(Math.hypot(p.x + o.x, p.y + o.y, p.z + o.z), WORLD.auUnits) + ' from ' + (this.game.sites.home ? this.game.sites.home.name : 'home');
     el.scrap.textContent = fmt(this.game.state.scrap);
     el.shield.style.width = (ship.shield / ship.shieldMax * 100) + '%';
     el.hull.style.width = (ship.hull / ship.hullMax * 100) + '%';
@@ -156,8 +158,8 @@ export class UI {
     const hpF = sel && sel.hpMax ? sel.hp / sel.hpMax : 0;
     el.gHp.style.strokeDashoffset = 314.2 * (1 - hpF);
     el.gLock.style.strokeDashoffset = 238.8 * (1 - (lance.on && lance.target === sel ? lance.lock : 0));
-    el.gSpeed.style.strokeDashoffset = 364.4 * (1 - Math.min(1, ship.speed / SHIP.maxSpeed));
-    this.fx.update(dt, { hp: hpF, lock: lance.on && lance.target === sel ? lance.lock : 0, speed: Math.min(1, ship.speed / SHIP.maxSpeed), selected: !!sel, hunting: this.game.mobs.list.some((m) => m.hunting) });
+    el.gSpeed.style.strokeDashoffset = 364.4 * (1 - Math.min(1, ship.speed / ship.stats.maxSpeed));
+    this.fx.update(dt, { hp: hpF, lock: lance.on && lance.target === sel ? lance.lock : 0, speed: Math.min(1, ship.speed / ship.stats.maxSpeed), selected: !!sel, hunting: this.game.mobs.list.some((m) => m.hunting) });
     // the HUD follows what you are dealing with: a condensate = harvest, a wisp or a wisp hunting you = combat, else nav
     const threat = this.game.mobs.list.find((m) => m.hunting && m.position.distanceTo(p) < 120);
     const want = (sel && sel.kind === 'mob') || threat ? 'combat' : sel && sel.kind === 'cloud' ? 'harvest' : 'nav';
@@ -189,9 +191,9 @@ export class UI {
     this.overviewTimer -= dt;
     if (this.overviewTimer > 0) return;
     this.overviewTimer = 0.25;
-    const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 10);
+    const near = rocks.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < this.game.ship.stats.overviewRange).sort((a, b) => a[1] - b[1]).slice(0, 10);
     const far = this.game.sites.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).sort((a, b) => a[1] - b[1]);
-    const hostile = this.game.mobs.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < WORLD.overviewRange * 1.5).sort((a, b) => a[1] - b[1]);
+    const hostile = this.game.mobs.list.map((o) => [o, o.position.distanceTo(p) - o.radius]).filter(([, d]) => d < this.game.ship.stats.overviewRange * 1.5).sort((a, b) => a[1] - b[1]);
     const keep = new Set(), order = [];
     for (const [o, d] of [...far, ...hostile, ...near]) {
       let row = this.rows.get(o);

@@ -27,7 +27,7 @@ Then open http://localhost:8766/
 | `src/ship.js` | ship model, command autopilot (approach / orbit / keep / goto / direct), shield and hull |
 | `src/shield.js` | fresnel shield bubble shader (not mounted for now; the shield look is still to be designed) |
 | `src/selection.js` | selected target bracket |
-| `src/ui.js` | HUD, command bar, throttle, overview list, HUD states |
+| `src/ui.js` | HUD, command bar, throttle, the Attunement (the sensor list, 100 km reach), HUD states |
 | `src/hudfx.js` | living HUD layer: a canvas drawing petal strands, motes, edge strands and the overview thread every frame |
 | `src/marker.js` | destination marker |
 | `src/starfield.js` | parallax star shells and nebulas |

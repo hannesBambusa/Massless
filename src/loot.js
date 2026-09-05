@@ -27,6 +27,8 @@ export class Loot {
       this.items.push({ p: p.clone(), v, age: 0, value, key, c: c.clone().multiplyScalar(rnd(0.8, 1.6)) });
     }
   }
+  /** floating origin */
+  shift(d) { for (const it of this.items) it.p.sub(d); }
   update(dt) {
     const ship = this.ship.position;
     const gained = {};

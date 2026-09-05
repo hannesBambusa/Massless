@@ -1,7 +1,7 @@
 // "Medusa": a deep-sea jelly. A translucent wire bell that pulses, a knot of light inside it, and long trailing
 // tentacles that ripple in its wake. Ice, sky and white with a warm gold gut. The only design that swims.
 //   Drift  - idle:   slow, deep pulses; tentacles hang loose and spread wide behind the bell
-//   Jet    - flight: quick hard pulses in time with speed, the bell narrows, tentacles trail straight and long
+//   Jet    - flight: slightly quicker, shallow pulses, the bell narrows, tentacles trail straight and long
 //   Curl   - orbit:  tentacles curl inward toward the target side, the bell leans
 // The bell is a lat/long line mesh rebuilt each frame (pulse changes its profile), tentacles are Catmull-Rom curves. Forward is -Z.
 import * as THREE from 'three';
@@ -12,7 +12,7 @@ import { Bender } from './bend.js';
 
 export const id = 'medusa';
 export const name = 'Medusa';
-export const description = 'A pulsing wire bell with a knot of light inside and long rippling tentacles. Drifts with slow deep pulses at rest, jets with quick hard ones in flight, curls in orbit.';
+export const description = 'A pulsing wire bell with a knot of light inside and long rippling tentacles. Drifts with slow smooth pulses at rest, narrows and trails long in flight, curls in orbit.';
 
 const LAT = 7, LON = 16;         // bell rings and meridians
 const TENT = 10, TCTRL = 6, TSAMP = 24;
@@ -56,10 +56,11 @@ export function build() {
     const b = state.bend; if (b) bend.set(b.trail, b.scale, b.inv, b.invQ, b.spin || 0);
     w += (clamp(state.speedFrac * 1.8 + state.thrust * 0.5, 0, 1) - w) * damp(2.2, dt);
     curl += ((state.orbiting ? 1 : 0) - curl) * damp(2, dt);
-    // heartbeat: slow at rest, fast in flight; pulse is a sharp contraction then a slow release
-    beat += dt * (0.55 + w * 1.6 + state.thrust * 0.6);
-    const ph = beat % 1; pulse = ph < 0.25 ? Math.sin(ph / 0.25 * Math.PI / 2) : Math.cos((ph - 0.25) / 0.75 * Math.PI / 2);   // 0 open, 1 contracted
-    const contract = pulse * (0.28 + w * 0.2);
+    // heartbeat: a smooth sine, slow at rest and only a little quicker in flight; the target pulse is eased so nothing snaps
+    beat += dt * (0.35 + w * 0.35 + state.thrust * 0.15);
+    const wantPulse = 0.5 - 0.5 * Math.cos(beat * TAU);   // 0 open, 1 contracted
+    pulse += (wantPulse - pulse) * damp(4, dt);
+    const contract = pulse * (0.16 + w * 0.08);
 
     // bell profile: rings from apex (i=0) to rim (i=LAT-1); contraction narrows the rim and lengthens the bell
     const rBell = BELL_R * (1 - contract - w * 0.25), hBell = BELL_H * (1 + contract * 0.6 + w * 0.35);

@@ -41,6 +41,8 @@ export class Mobs {
     return g;
   }
 
+  /** floating origin */
+  shift(d) { for (const m of this.list) { m.position.sub(d); m.home.sub(d); } }
   dispose() { this.group.parent && this.group.parent.remove(this.group); if (this.tethers) this.tethers.parent && this.tethers.parent.remove(this.tethers); this.list = []; if (this.items) this.items = []; }
   update(dt, ship, onDeath) {
     for (let i = this.list.length - 1; i >= 0; i--) {

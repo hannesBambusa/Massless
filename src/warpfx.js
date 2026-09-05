@@ -54,8 +54,8 @@ export class WarpFx {
     this.mat.opacity = w * 0.7 * (1 - jump);   // no streaks through a fold: space bends instead
     // jump: the streaks go violet-white and stretch far longer
     this.mat.color.setRGB(0.6 + jump * 0.4, 0.9 - jump * 0.3, 1.0).multiplyScalar(1.3 + jump * 0.6);
-    this.stretch = 1 + Math.min(6, speed / 400) + jump * 12;
-    const v = Math.min(400, speed * 0.6) * dt;   // streaks flow backward (+z)
+    this.stretch = 1 + 6 * w + jump * 12;                   // streak length follows the warp weight, not the raw speed
+    const v = 400 * w * dt;                                   // streaks flow backward (+z)
     for (const s of this.seed) { s.z += v; if (s.z > LEN) s.z -= LEN * 2; }
     this.write();
   }

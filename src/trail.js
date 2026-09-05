@@ -36,5 +36,7 @@ export class Trail {
     const tail = this.pts[n - 1];   // beyond the stored path: continue straight
     outT.copy(tail.t); outP.copy(tail.p).addScaledVector(tail.t, -(s - this.len[n - 1]));
   }
+  /** floating origin */
+  shift(d) { for (const q of this.pts) q.p.sub(d); }
   reset(pos, heading) { this.pts = [{ p: pos.clone(), t: heading.clone() }]; this.len = [0]; }
 }

@@ -6,4 +6,4 @@ export const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? (n 
 /** exponential smoothing factor for a per-second rate over a frame of dt seconds */
 export const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
 /** distance for the HUD: local in metres, anything beyond in AU. auUnits: world units per AU */
-export const fmtDist = (d, auUnits = 25000, auDecimals = 2) => d < 1000 ? Math.round(d) + ' m' : d < 10000 ? (d / 1000).toFixed(1) + ' km' : (d / auUnits).toFixed(auDecimals) + ' AU';
+export const fmtDist = (d, auUnits = 1.496e11, auDecimals = 2) => d < 10000 ? Math.round(d).toLocaleString() + ' m' : d < 1e7 ? Math.round(d / 1000).toLocaleString() + ' km' : (d / auUnits).toFixed(auDecimals) + ' AU';

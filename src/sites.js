@@ -26,6 +26,8 @@ export class Sites {
     scene.add(this.group);
   }
   dispose() { this.scene.remove(this.group); }
+  /** floating origin: sites keep double-precision positions on the CPU, so shifting them is exact */
+  shift(d) { for (const s of this.list) s.position.sub(d); }
   get home() { return this.list.find((s) => s.home) || this.list[0]; }
 
   build(def) {
@@ -56,9 +58,9 @@ export class Sites {
     const name = NEW_NAMES.find((n) => !used.has(n)) || `Tear ${this.list.length}`;
     let pos;
     for (let tries = 0; tries < 40; tries++) {
-      pos = [rnd(-30000, 30000), rnd(-1500, 1500), rnd(-30000, 30000)];
+      pos = [rnd(-10, 10) * 1.496e11, rnd(-0.5, 0.5) * 1.496e11, rnd(-10, 10) * 1.496e11];
       const p = new THREE.Vector3(...pos);
-      if (this.list.every((s) => s.position.distanceTo(p) > 6000)) break;
+      if (this.list.every((s) => s.position.distanceTo(p) > 2 * 1.496e11)) break;
     }
     const g = this.build({ name, pos, color: NEW_COLORS[this.list.length % NEW_COLORS.length], type: 'combat' });
     this.list.push(g);

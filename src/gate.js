@@ -39,6 +39,7 @@ export class Gate {
     return this.group.position.clone().add(new THREE.Vector3(Math.cos(a) * d, rnd(-0.15, 0.15) * d, Math.sin(a) * d));
   }
   dispose() { this.scene.remove(this.group); }
+  shift(d) { /* the gate group is in sites.list and is shifted there */ }
   update(dt) {
     const g = this.group; g.t += dt; const t = g.t;
     for (const r of this.rings) r.rotation.z += r.w * dt;
