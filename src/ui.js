@@ -9,6 +9,7 @@ import { ResizablePanel } from './panel.js';
 import { Settings } from './settings.js';
 import { FitUI } from './fitui.js';
 import { SkillUI } from './skillui.js';
+import { CodexUI } from './codexui.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -31,6 +32,9 @@ export class UI {
     this.settings = new Settings();
     this.fitting = new FitUI(game, (msg) => this.flash(msg));
     this.skills = new SkillUI(game, (msg) => this.flash(msg));
+    this.codex = new CodexUI(game);
+    game.codex.onUnlock((e) => this.fanfare(e.name, `${e.group} · logged in the codex`));
+    game.onBlueprint = (m) => this.fanfare('Blueprint found', `${m.name} can now be bound`);
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyH') el.help.hidden = !el.help.hidden; });
     for (const b of document.querySelectorAll('[data-cmd]')) b.addEventListener('click', () => game.command(b.dataset.cmd));
     for (const r of SHIP.ranges) {
@@ -40,15 +44,21 @@ export class UI {
     }
     this.syncRanges();
     el.throttle.addEventListener('input', () => { game.ship.throttle = el.throttle.value / 100; el.throttleNum.textContent = el.throttle.value + '%'; });
-    for (const d of DESIGNS) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name; o.title = d.description; el.design.appendChild(o); }
-    el.design.value = game.ship.design;
-    el.design.addEventListener('change', () => { game.ship.setDesign(el.design.value); el.design.blur(); });
+    for (const d of DESIGNS) { const o = document.createElement('option'); o.value = d.id; o.title = d.description; el.design.appendChild(o); }
+    this.syncDesigns();
+    el.design.addEventListener('change', () => {
+      const id = el.design.value;
+      if (!game.loadout.unlocked(id)) { const r = game.loadout.canUnlock(id); this.flash(r.reason); el.design.value = game.ship.design; el.design.blur(); return; }
+      game.ship.setDesign(id); el.design.blur();
+    });
+    game.loadout.onChange(() => this.syncDesigns());
     el.mode.addEventListener('click', () => game.toggleMode());
     // systems: one row each, click picks the jump target
     this.sysRows = new Map();
     for (const sys of SYSTEMS) {
       const row = document.createElement('div'); row.className = 'ov-row system'; row.dataset.id = sys.id;
-      row.innerHTML = `<span class="ov-node"></span><span class="ov-name">${sys.name}</span><span class="ov-dist"></span><button class="ov-act jump" title="Fold to ${sys.name}"><svg><use href="#i-warp"/></svg></button><span class="ov-bar"></span>`;
+      row.title = sys.entry ? `Tier ${sys.tier}. Yield ×${sys.yield}, threat ×${sys.threat}. Fold needs ${sys.entry.box ? 'the ' + sys.entry.box.split('.').slice(0, 2).join(' ') + ' skill' : ''}${sys.entry.box && sys.entry.module ? ' or ' : ''}${sys.entry.module ? 'a fitted ' + sys.entry.module : ''}` : `Tier ${sys.tier}. Open`;
+      row.innerHTML = `<span class="ov-node"></span><span class="ov-name">${sys.name} <small class="tier">T${sys.tier}</small></span><span class="ov-dist"></span><button class="ov-act jump" title="Fold to ${sys.name}"><svg><use href="#i-warp"/></svg></button><span class="ov-bar"></span>`;
       row.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.closest('.ov-act')) return; if (sys.id === game.system.id) return; game.jumpTarget = sys; });
       row.querySelector('.ov-act').addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button !== 0) return; game.jumpTarget = sys; game.command('jump'); });
       el.sysList.appendChild(row); this.sysRows.set(sys.id, row);
@@ -72,21 +82,38 @@ export class UI {
   }
   /** the hold: one row per energy collected, bumping when it grows */
   updateHold() {
-    const hold = this.game.state.hold; this.holdRows = this.holdRows || new Map();
-    for (const key in hold) {
+    const hold = this.game.state.hold, bank = this.game.state.bank || {}; this.holdRows = this.holdRows || new Map();
+    let atRisk = 0;
+    for (const key of new Set([...Object.keys(hold), ...Object.keys(bank)])) {
       const e = ENERGY_BY_KEY[key]; if (!e) continue;
       let row = this.holdRows.get(key);
       if (!row) {
         row = document.createElement('div'); row.className = 'hold-row'; row.style.setProperty('--c', '#' + e.color.toString(16).padStart(6, '0'));
-        row.innerHTML = `<i></i><span class="name">${e.name}</span><span class="n">0</span>`;
-        el.holdList.appendChild(row); this.holdRows.set(key, row); row.last = 0;
+        row.innerHTML = `<i></i><span class="name">${e.name}</span><span class="n">0</span><span class="b"></span>`;
+        el.holdList.appendChild(row); this.holdRows.set(key, row); row.last = -1; row.lastB = -1;
       }
-      const n = Math.floor(hold[key]);
+      const n = Math.floor(hold[key] || 0), b = Math.floor(bank[key] || 0); atRisk += n;
       if (n !== row.last) { row.last = n; row.querySelector('.n').textContent = n; row.classList.remove('bump'); void row.offsetWidth; row.classList.add('bump'); }
+      if (b !== row.lastB) { row.lastB = b; row.querySelector('.b').textContent = b ? `+${b}` : ''; }
     }
+    const title = el.holdList.previousElementSibling; if (title) title.textContent = atRisk ? `Hold · ${Math.floor(atRisk)} at risk` : 'Hold · banked';
   }
   /** a manual pick holds the state for a while before the HUD goes back to following the target */
   lockHud(mode) { this.setHud(mode); clearTimeout(this.hudLockT); this.hudLock = true; this.hudLockT = setTimeout(() => { this.hudLock = false; }, 6000); }
+  /** option labels follow what is unlocked; a locked shell you are somehow flying falls back to Bloom */
+  syncDesigns() {
+    const lo = this.game.loadout;
+    for (const o of el.design.options) { const d = DESIGNS.find((x) => x.id === o.value); o.textContent = lo.unlocked(o.value) ? d.name : `${d.name} · locked`; }
+    if (!lo.unlocked(this.game.ship.design)) this.game.ship.setDesign('bloom');
+    el.design.value = this.game.ship.design;
+  }
+  /** a first: announce it, pulse the HUD, and let the shell bloom for a moment */
+  fanfare(title, sub) {
+    this.announce(title, sub);
+    document.body.classList.remove('morphing'); void document.body.offsetWidth; document.body.classList.add('morphing');
+    document.body.classList.add('fanfare'); clearTimeout(this.fanfareT); this.fanfareT = setTimeout(() => document.body.classList.remove('fanfare'), 2600);
+    this.game.ship.fanfare = 1;
+  }
   /** morph the HUD into one of its states: nav | harvest | combat */
   setHud(mode, silent = false) {
     if (this.hud === mode) return;
@@ -211,10 +238,10 @@ export class UI {
         row.addEventListener('dblclick', () => { selection.set(o); this.game.command('approach'); });
         this.rows.set(o, row);
       }
-      row.children[1].textContent = o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
+      row.children[1].textContent = o.resonating && this.game.sites.resonance ? `${o.name} · ${Math.ceil(this.game.sites.resonance.left)} s` : o.name; row.children[2].textContent = fmtDist(d, WORLD.auUnits);
       if (o.kind === 'site') row.querySelector('.ov-act').hidden = ship.warping || d < 150;
       row.style.setProperty('--f', (1 - Math.min(1, Math.log10(1 + d) / 5)).toFixed(2));   // closer = longer bar
-      row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting);
+      row.classList.toggle('on', o === sel); row.classList.toggle('hunting', !!o.hunting); row.classList.toggle('rare', !!o.rare); row.classList.toggle('bounty', !!o.bounty); row.classList.toggle('resonating', !!o.resonating);
       if (o.kind === 'site') { row.dataset.type = o.type; row.title = { harvest: 'Harvest site: streams and condensates', combat: 'Combat site: a rift with wisps', cleared: 'Cleared: the rift here collapsed', gate: 'Gate: the dark hole folds open onto other systems; arrivals emerge around it', haven: 'Haven: your home. Only you can warp here' }[o.type] || ''; }
       keep.add(o); order.push(row);
     }

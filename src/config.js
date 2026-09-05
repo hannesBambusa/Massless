@@ -56,7 +56,10 @@ export const WORLD = {
   streams: 4,          // helical energy streams per harvest site
   overviewRange: 100000,   // reach of the attunement: condensates and wisps this close are listed (sites always are)
   auUnits: 1.496e11,   // metres per AU. The world is real metres: m below 10 km, km below 10,000 km, AU beyond
-  rebaseAt: 20000,     // floating origin: when the ship is this far from the origin, the world is shifted back under it
+  rebaseAt: 20000,
+  lossOnDeath: 0.3,    // fraction of the hold scattered when the core is unbound; the bank is never touched
+  dockTime: 2,         // seconds inside the haven bubble before the hold is banked
+  heatFull: 600,       // hold this many unbanked fragments and hunters reach as far as they ever will     // floating origin: when the ship is this far from the origin, the world is shifted back under it
   hudGrid: 20,         // invisible screen grid (px) that resizable HUD panels snap to
   overviewMin: [200, 120], // smallest overview panel [w, h] in px
 };
@@ -108,7 +111,8 @@ export const ROCK = {             // energy condensates: the harvestable things
   scrapPerRadius: 4,   // scrap on unbinding
   motesPerRadius: 5,
   autoRange: 1600,     // auto harvest only considers condensates this close
-  autoShow: 1000,      // the auto harvest offer appears when a condensate is within this
+  autoShow: 1000,
+  lumenBlueprint: 0.35, // a Lumen condensate drops a blueprint this often      // the auto harvest offer appears when a condensate is within this
 };
 
 /** the kinds of bound energy a condensate can be made of. key: inventory slot, name: what the player sees */
@@ -125,6 +129,17 @@ export const ENERGY_BY_KEY = Object.fromEntries(ENERGY.map((e) => [e.key, e]));
 export const MOB = {              // per-kind numbers live in mobtypes.js
   perCombatSite: 7,    // hostiles at a rift (a shoal pack counts as one)
   leashRange: 700,     // a hostile gives up the hunt beyond this
+  heatReach: 0.8,
+  blueprintChance: 0.08, // per kill, times the system's threat; maws double it      // aggro radius grows by up to this fraction with an unbanked hold
+};
+
+export const EVENTS = {
+  resonanceEvery: 240,   // seconds between resonances (jittered)
+  resonanceFor: 75,      // seconds a site rings
+  resonanceYield: 2,     // fragment multiplier at a resonating site
+  bountyEvery: 300,      // seconds between bounty sightings (jittered); one at a time
+  waves: 2,              // extra waves a rift pours out before it can be sealed
+  waveSize: 3,           // hostiles per wave, plus the wave number
 };
 
 export const BLOOM = { strength: 0.9, radius: 0.7, threshold: 0.2 };

@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FoldPass } from './foldpass.js';
-import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP, WORLD, WEAPONS, ENERGY_BY_KEY } from './config.js';
+import { COLORS, CAMERA, BLOOM, DIRECT, WARP, ROCK, MOB, LANCE, JUMP, WORLD, WEAPONS, ENERGY_BY_KEY, EVENTS } from './config.js';
 import { Ship } from './ship.js';
 import { Starfield } from './starfield.js';
 import { Asteroids } from './asteroids.js';
@@ -24,11 +24,12 @@ import { Marker } from './marker.js';
 import { Selection } from './selection.js';
 import { UI } from './ui.js';
 import { keys, bindPointer } from './input.js';
-import { clamp, damp } from './utils.js';
+import { clamp, damp, rnd } from './utils.js';
 import { loadProgress, ProgressSaver } from './save.js';
 import { Loadout } from './loadout.js';
 import { Training } from './training.js';
 import { Codex } from './codex.js';
+import { Wallet } from './wallet.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // retina at 2x doubles the bloom cost for little gain
@@ -72,7 +73,7 @@ game.loadSystem = (id) => {
   const harvest = game.sites.list.filter((x) => x.type === 'harvest'), combat = game.sites.list.filter((x) => x.type === 'combat');
   game.streams = new Streams(scene, harvest.map((x) => x.position));
   game.rocks = new Asteroids(scene, game.sites.list, game.streams);
-  game.mobs = new Mobs(scene, game.sites.list);
+  game.mobs = new Mobs(scene, game.sites.list, sys.threat || 1);
   if (game.arsenal) { game.arsenal.mobs = game.mobs; game.arsenal.reset(); }
   game.rifts = new Rifts(scene, combat);
   game.gate = new Gate(scene, sys.gate);
@@ -98,6 +99,7 @@ game.lance = new Lance(scene, game.ship);
 game.arsenal = new Arsenal(scene, game.ship, game.mobs);
 for (const k of ["hold", "fits", "owned"]) if (!game.state[k]) game.state[k] = {};
 game.saver = new ProgressSaver(game.state);
+game.wallet = new Wallet(game.state);   // hold (at risk) + bank (safe in the haven)
 game.training = new Training(game);   // skills: learned boxes, paid in fragments
 game.codex = new Codex(game.state);    // the log of firsts
 game.loadout = new Loadout(game);   // fitting: shells, owned modules, derived stats
@@ -108,11 +110,21 @@ game.loot = new Loot(scene, game.ship, (key, n, harvested) => {
 });
 const { ship, selection, marker, stars } = game;
 
+/** can the core fold to this system? entry needs a learned box or a fitted module */
+game.canFold = (sys) => {
+  const e = sys.entry; if (!e) return { ok: true };
+  if (e.box && game.training.has(e.box)) return { ok: true };
+  if (e.module && Object.values(game.loadout.shell.equipped).some((a) => a.some((c) => c && c.online && c.module.base === e.module))) return { ok: true };
+  const ways = []; if (e.box) ways.push(`the ${game.training.box(e.box).name} box`); if (e.module) ways.push(`a fitted ${game.loadout.baseModule(e.module).name}`);
+  return { ok: false, reason: `${sys.name} needs ${ways.join(' or ')}` };
+};
+
 /** run a command against the selected target (or stop) */
 game.command = (name) => {
   const t = selection.obj;
   if (name === 'jump') {
     const sys = game.jumpTarget; if (!sys || sys.id === game.system.id) return ui.flash('Pick another system in the overview');
+    const gate = game.canFold(sys); if (!gate.ok) return ui.flash(gate.reason);
     if (game.auto) game.toggleAuto(); game.lance.stop(); selection.clear();
     ship.jumpTo(sys, () => {
       // mid-fold: swap the world under the ship; the ship then runs in along its line and stops beside the new home site
@@ -152,7 +164,9 @@ game.die = () => {
   game.dying = true;
   game.lance.stop();
   if (game.auto) game.toggleAuto();
-  ui.announce('Unbound', 'The core re-forms at ' + game.sites.home.name);
+  const lost = game.wallet.lose(WORLD.lossOnDeath), sum = Object.values(lost).reduce((a, b) => a + b, 0);
+  game.saver.mark();
+  ui.announce('Unbound', sum ? `${sum} fragments scattered to the dark. The core re-forms at ${game.sites.home.name}` : 'The core re-forms at ' + game.sites.home.name);
   setTimeout(game.respawn, 1500);
 };
 game.respawn = () => {
@@ -172,7 +186,8 @@ game.toggleMode = () => {
 ship.position.copy(game.haven ? game.haven.spawnPoint() : game.sites.home.position.clone().add(new THREE.Vector3(0, 0, 160)));   // you wake inside your haven
 game.snapCamera = true;   // the first rebase moves the world under the ship; the camera must land with it
 const ui = new UI(game);
-game.overlayOpen = () => ui.fitting.open || ui.settings.open || ui.skills.open;
+window.massless = game;   // dev hook: poke the game from the console
+game.overlayOpen = () => ui.fitting.open || ui.settings.open || ui.skills.open || ui.codex.open;
 ui.setMode(false);
 
 // pointer: click selects, double-click in space flies that way, drag orbits the camera, wheel zooms
@@ -300,19 +315,45 @@ window.addEventListener('resize', () => {
 let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  // banking: sitting inside the haven bubble moves the hold into the bank; the hold's weight makes hunters bolder
+  if (game.haven && !game.dying && ship.position.distanceTo(game.haven.group.position) < game.haven.group.radius * 0.9) {
+    game.dockT = (game.dockT || 0) + dt;
+    if (game.dockT > WORLD.dockTime && game.wallet.holdTotal() >= 1) { const moved = game.wallet.deposit(); game.saver.mark(); ui.flash(`Banked ${Object.entries(moved).map(([k, n]) => `${Math.floor(n)} ${k}`).join(', ')}`); }
+  } else game.dockT = 0;
+  ship.heat = Math.min(1, game.wallet.holdTotal() / WORLD.heatFull);
+  // events: a resonating harvest site now and then, and a bounty roaming the system
+  game.resonanceT = (game.resonanceT ?? EVENTS.resonanceEvery * 0.4) - dt;
+  if (game.resonanceT <= 0 && !game.sites.resonating) {
+    const sites = game.sites.list.filter((x) => x.type === 'harvest' && !x.private); const site = sites[Math.floor(Math.random() * sites.length)];
+    if (site) { game.sites.resonate(site, EVENTS.resonanceFor); ui.fanfare(`${site.name} resonates`, `Yield ×${EVENTS.resonanceYield} for ${EVENTS.resonanceFor} s. Wisps are drawn to it`); game.mobs.wave(site, 2); }
+    game.resonanceT = EVENTS.resonanceEvery * rnd(0.8, 1.2);
+  }
+  game.bountyT = (game.bountyT ?? EVENTS.bountyEvery * 0.5) - dt;
+  if (game.bountyT <= 0 && !game.mobs.list.some((m) => m.bounty)) {
+    const sites = game.sites.list.filter((x) => x.type === 'combat'); const site = sites[Math.floor(Math.random() * sites.length)];
+    if (site) { const b = game.mobs.addBounty(site); ui.fanfare('Bounty sighted', `${b.name} roams ${site.name}. A blueprint and Lumen for whoever unbinds it`); }
+    game.bountyT = EVENTS.bountyEvery * rnd(0.8, 1.3);
+  }
   game.rebase();
   if (game.direct) updateDirect();
   ship.camDist = camera.position.distanceTo(ship.position);
   ship.update(dt);
   game.rocks.update(dt, (rock) => {
     if (game.auto && game.lance.target === rock) setTimeout(() => game.auto && game.autoNext(), 400);
-    game.loot.burst(rock.position, Math.round(rock.radius * ROCK.motesPerRadius), ROCK.scrapPerRadius * rock.radius / Math.round(rock.radius * ROCK.motesPerRadius), rock.tint, rock.energy.key, true);
+    const motes = Math.round(rock.radius * ROCK.motesPerRadius), reson = rock.site && rock.site.resonating ? EVENTS.resonanceYield : 1;
+    game.loot.burst(rock.position, motes, ROCK.scrapPerRadius * rock.radius * game.system.yield * reson / motes, rock.tint, rock.energy.key, true);
+    if (rock.energy.key === 'lumen' && Math.random() < ROCK.lumenBlueprint) game.loadout.dropBlueprint(rock.position);
     if (selection.obj === rock) selection.clear();
     if (ship.cmd.obj === rock) ship.stop();
   });
   game.mobs.update(dt, ship, (mob) => {
     game.codex.unlock(`mob.${mob.mobKind}`);
-    game.loot.burst(mob.position, 14, mob.def.scrap / 14, ENERGY_BY_KEY[mob.def.drop].color, mob.def.drop);
+    game.loot.burst(mob.position, 14, mob.def.scrap * game.system.yield / 14, ENERGY_BY_KEY[mob.def.drop].color, mob.def.drop);
+    if (mob.bounty) { game.loadout.dropBlueprint(mob.position); game.loot.burst(mob.position, 10, mob.def.scrap * game.system.yield / 10, ENERGY_BY_KEY.lumen.color, 'lumen'); game.codex.unlock('act.bounty'); ui.fanfare('Bounty claimed', `${mob.name} unbound`); game.bountyT = EVENTS.bountyEvery * rnd(0.7, 1.3); }
+    else if (Math.random() < MOB.blueprintChance * game.system.threat * (mob.mobKind === 'maw' ? 2 : 1)) game.loadout.dropBlueprint(mob.position);
+    // rift waves: a combat site with a rift pours out a wave when its count drops, up to EVENTS.waves times, then the rift is done
+    const ws = mob.site;
+    if (ws && ws.type === 'combat' && !mob.bounty) { ws.waves = ws.waves || 0; const left = game.mobs.list.filter((m) => m.site === ws).length; if (left <= 2 && ws.waves < EVENTS.waves) { ws.waves++; game.mobs.wave(ws, EVENTS.waveSize + ws.waves); ui.flash(`${ws.name}: wave ${ws.waves + 1} pours from the rift`); } }
     if (mob.def.ash) game.loot.burst(mob.position, 6, mob.def.ash / 6, ENERGY_BY_KEY.ash.color, 'ash');
     if (selection.obj === mob) selection.clear();
     if (ship.cmd.obj === mob) ship.stop();
@@ -322,6 +363,8 @@ function frame(now) {
       const rift = game.rifts.list.find((r) => r.site === st);
       if (rift) game.rifts.collapse(rift);
       st.type = 'cleared';
+      game.loadout.dropBlueprint(st.position); game.loot.burst(st.position, 24, 12 * game.system.yield, ENERGY_BY_KEY.lumen.color, 'lumen');
+      game.codex.unlock('act.rift'); ui.fanfare('Rift sealed', `${st.name} is quiet. Lumen and a blueprint spill from the seam`);
       const fresh = game.sites.spawnCombat();
       game.rifts.add(fresh); game.mobs.populate(fresh); game.rocks.populate(fresh, null);
       ui.flash(`${st.name} rift collapsed. A new tear opens at ${fresh.name}`);

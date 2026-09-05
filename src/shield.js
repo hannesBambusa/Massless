@@ -16,14 +16,17 @@ const frag = /* glsl */`
   uniform vec3 color; uniform vec3 hot; uniform float time; uniform float hit; uniform float base;
   varying vec3 vNormal; varying vec3 vView; varying vec3 vPos;
   void main() {
-    float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 4.5);
+    // clamp before pow: |dot| can exceed 1.0 by a float epsilon at grazing angles, and pow of a negative base is NaN,
+    // which the bloom pass smears into black blocks
+    float nd = clamp(abs(dot(normalize(vNormal), normalize(vView))), 0.0, 1.0);
+    float fres = pow(1.0 - nd, 4.5);
     // ripples: two slow bands over the sphere plus a fine shimmer
     float band = 0.5 + 0.5 * sin(vPos.y * 2.4 + time * 1.6) * sin(vPos.x * 1.7 - time * 1.1);
     float shimmer = 0.5 + 0.5 * sin((vPos.x + vPos.z) * 9.0 + time * 4.0);
     float a = fres * (base + band * 0.08) + shimmer * 0.004;
     a += hit * (0.06 + fres * 0.35);
     vec3 c = mix(color, hot, hit);
-    gl_FragColor = vec4(c * (0.8 + hit * 0.5), a);
+    gl_FragColor = vec4(c * (0.8 + hit * 0.5), clamp(a, 0.0, 1.0));
   }`;
 
 export class Shield {

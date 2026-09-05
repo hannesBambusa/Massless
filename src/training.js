@@ -12,8 +12,13 @@ export class Training {
   get s() { if (!this.game.state.skills) this.game.state.skills = normalizeSkills(null); return this.game.state.skills; }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   changed() { if (this.game.saver) this.game.saver.mark(); if (this.game.loadout) this.game.loadout.apply(); for (const fn of this.listeners) fn(); }
-  get hold() { return this.game.state.hold; }
-  learn(box) { const r = learn(this.s, box, this.hold); if (r.ok) { this.changed(); if (box.kind === 'master' && this.game.codex) this.game.codex.unlock(`master.${box.prof}`); } return r; }
+  get hold() { return this.game.wallet.totals(); }
+  learn(box) {
+    const r = canLearn(this.s, box, this.hold); if (!r.ok) return r;
+    this.s.learned.push(box.id); for (const k in box.frags) this.game.wallet.spend(k, box.frags[k]);
+    this.changed(); if (box.kind === 'master' && this.game.codex) this.game.codex.unlock(`master.${box.prof}`);
+    return r;
+  }
   surrender(box) { const r = surrender(this.s, box); if (r.ok) this.changed(); return r; }
   check(box) { return canLearn(this.s, box, this.hold); }
   checkSurrender(box) { return canSurrender(this.s, box); }

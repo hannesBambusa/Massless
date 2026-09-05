@@ -20,6 +20,7 @@ export class Ship {
     // derived stats, owned by the loadout (fitting); defaults are the bare config numbers until a fit is applied
     this.stats = { integrity: SHIP.hull, shield: SHIP.shield, shieldRegen: SHIP.shieldRegen, maxSpeed: SHIP.maxSpeed, lanceDps: 22, lanceRange: 120, lockTime: 1.2, overviewRange: 400 };
     this.onDesign = null;   // set by the loadout: called with the design id after a swap
+    this.fanfare = 0;       // 1 right after a first / milestone, decays; the engines and design glow swell with it
 
     this.setDesign(localStorage.getItem('massless-ship') || 'bloom');
 
@@ -274,7 +275,8 @@ export class Ship {
     this.bank += (wantBank - this.bank) * damp(5, dt);
     this.shield = clamp(this.shield + this.stats.shieldRegen * dt, 0, this.shieldMax);
     this.shieldHit = Math.max(0, this.shieldHit - dt * 3);
-    for (const e of this.engines) { const s = 0.9 + thrust * 1.1; e.scale.setScalar(s); e.material.opacity = 0.3 + thrust * 0.4; }
+    this.fanfare = Math.max(0, this.fanfare - dt * 0.45);
+    for (const e of this.engines) { const s = (0.9 + thrust * 1.1) * (1 + this.fanfare * 1.6); e.scale.setScalar(s); e.material.opacity = Math.min(1, 0.3 + thrust * 0.4 + this.fanfare * 0.5); }
     // corkscrew: roll about the centreline while orbiting, eased in and out
     this.spinRate += ((orbiting ? SHIP.orbitSpin : 0) - this.spinRate) * damp(2, dt);
     this.spin = (this.spin + this.spinRate * dt) % (Math.PI * 2);
@@ -290,7 +292,7 @@ export class Ship {
     g.updateMatrixWorld(true);
     this._inv.copy(this.body.matrixWorld).invert();                   // world -> body local (model group sits at the body origin, only scaled)
     this._invQ.setFromRotationMatrix(this._inv).normalize();
-    this.model.update(dt, { thrust: Math.max(thrust, this.warpW), speedFrac: clamp(this.speed / this.stats.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
+    this.model.update(dt, { thrust: Math.min(1, Math.max(thrust, this.warpW) + this.fanfare * 0.8), fanfare: this.fanfare, speedFrac: clamp(this.speed / this.stats.maxSpeed, 0, 1), warp: this.warpW, orbiting, bend: { trail: this.trail, scale: this.model.group.getWorldScale(new THREE.Vector3()), inv: this._inv, invQ: this._invQ, spin: this.spin + this.bank } });
     this.warpFx.update(dt, this.warpW, this.warpV, this.jumpW);
     this.warpFx.spool(dt, this.spoolW, this.jumpW);
     // distance fade: the glow sprites have a fixed world size, so from far away they bloom into a single blob. Scale their

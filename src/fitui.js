@@ -38,10 +38,15 @@ export class FitUI {
     this.lo.onChange(() => { if (!this.el.hidden) this.render(); });
     this.list.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
-      const m = this.lo.modules.find((x) => x.id === b.dataset.id); if (!m) return;
+      const m = this.lo.resolve(b.dataset.id); if (!m) return;
       const r = b.dataset.act === 'buy' ? this.lo.buy(m) : this.lo.fit(m);
-      this.flash(r.ok ? (b.dataset.act === 'buy' ? `${m.name} bound` : `${m.name} fitted`) : r.reason);
+      this.flash(r.ok ? (b.dataset.act === 'buy' ? `${r.module.name} bound` : `${m.name} fitted`) : r.reason);
       this.render();
+    });
+    $('fit-shells').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.act === 'fly') { this.game.ship.setDesign(b.dataset.id); this.render(); return; }
+      const r = this.lo.unlock(b.dataset.id); this.flash(r.ok ? `${DESIGNS.find((d) => d.id === b.dataset.id).name} bound to you` : r.reason); this.render();
     });
     $('fit-slots').addEventListener('click', (e) => {
       const h = e.target.closest('.hex'); if (!h) return;
@@ -95,12 +100,18 @@ export class FitUI {
     const rows = lo.sets.map((s) => ({ s, on: activeIds.has(s.id), have: counts[s.family] || 0 })).filter((x) => x.on || x.have > 0);
     $('fit-sets').innerHTML = rows.length ? rows.map(({ s, on, have }) => `<div class="set-row ${on ? 'on' : 'off'}" style="--c:${hex(fam(s.family).color)}"><i></i><span class="name">${s.name}</span><span class="cnt">${Math.min(have, s.count)}/${s.count}</span><span class="desc">${s.desc}</span></div>`).join('') : `<div class="harm-empty">Fit two modules of one family to wake a harmonic</div>`;
 
+    // shells: fly, unlock, or see what it takes
+    $('fit-shells').innerHTML = DESIGNS.map((d) => { const un = lo.unlocked(d.id), u = lo.unlockOf(d.id), cur = d.id === shell.id, chk = un ? null : lo.canUnlock(d.id);
+      const price = !u ? 'free' : u.tag ? u.tag.replace('master-', 'Master ') : Object.entries(u.frags).map(([k, n]) => `${n} ${fam(k).name}`).join(', ');
+      return `<div class="shell-row ${cur ? 'cur' : ''} ${un ? '' : 'locked'}"><span class="node"></span><span class="name">${d.name}<small>${un ? (cur ? 'flying' : 'yours') : price}</small></span><span>${un ? (cur ? '' : `<button data-act="fly" data-id="${d.id}">Fly</button>`) : (u.tag ? '' : `<button data-act="unlock" data-id="${d.id}" ${chk.ok ? '' : 'disabled'} title="${chk.ok ? '' : chk.reason}">Bind</button>`)}</span></div>`; }).join('');
+
     // drawer: modules for the selected slot type
     $('fit-drawer-head').textContent = `${SLOT_LABELS[this.sel]} modules`;
     this.list.innerHTML = lo.modules.filter((m) => m.slot === this.sel).map((m) => {
-      const f = fam(m.family), have = lo.fragments(m), own = lo.owned(m.id), chk = own ? lo.check(m) : null;
+      const f = fam(m.family), have = lo.fragments(m), bp = lo.hasBlueprint(m), variants = lo.ownedVariants(m);
       const mods = m.modifiers.map((x) => `${x.value > 0 ? '+' : ''}${x.value}${x.isPercentage ? '%' : ''} ${STAT_LABELS[x.stat] || x.stat}`).join(', ');
-      return `<div class="mod-row" style="--c:${hex(f.color)}"><span class="node"></span><span class="name">${m.name}<small>${mods}</small><small>${m.luminosityCost} lum · ${m.coherenceCost} coh · <b class="${have < m.cost ? 'poor' : ''}">${m.cost} ${f.name}</b> (${have} held)</small></span><span class="act">${own ? `<span class="own">×${own} held</span>` : ''}<span><button data-act="buy" data-id="${m.id}" ${have < m.cost ? 'disabled' : ''}>Bind</button> <button class="fit" data-act="fit" data-id="${m.id}" ${own && chk.ok ? '' : 'disabled'}>Fit</button></span></span>${chk && !chk.ok ? `<span class="why">${chk.reason}</span>` : ''}</div>`;
+      const owned = variants.map(({ module: v, n }) => { const chk = lo.check(v); return `<div class="variant ${v.grade || 'bright'}"><span class="gd">${(v.grade || 'bright')}</span><span class="vn">×${n}</span><button class="fit" data-act="fit" data-id="${v.id}" ${chk.ok ? '' : 'disabled'} title="${chk.ok ? '' : chk.reason}">Fit</button>${chk.ok ? '' : `<span class="why">${chk.reason}</span>`}</div>`; }).join('');
+      return `<div class="mod-row ${bp ? '' : 'nobp'}" style="--c:${hex(f.color)}"><span class="node"></span><span class="name">${m.name}<small>${mods}</small><small>${m.luminosityCost} lum · ${m.coherenceCost} coh · <b class="${have < m.cost ? 'poor' : ''}">${m.cost} ${f.name}</b> (${have} held)</small>${bp ? '' : '<small class="bpnote">blueprint unknown · drops from wisps and Lumen condensates</small>'}</span><span class="act"><button data-act="buy" data-id="${m.id}" ${bp && have >= m.cost ? '' : 'disabled'} title="Roll a grade for this system and bind">Bind</button></span>${owned ? `<div class="variants">${owned}</div>` : ''}</div>`;
     }).join('');
   }
 }

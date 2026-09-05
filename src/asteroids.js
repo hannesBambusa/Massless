@@ -36,6 +36,7 @@ export class Asteroids {
       const energy = Math.random() < 0.08 ? kinds[4] : pick(kinds.slice(0, 4));   // lumen is rare
       const tint = energy.color;
       m.tint = tint; m.energy = energy;   // the cloud's energy: colours the lance, the siphon and the loot, and names what you collect
+      m.rare = energy.key === 'lumen';    // rare: a bigger, brighter core and a slow white halo, and the overview marks it
       // cloud: points packed toward the centre
       const N = Math.round(60 + r * 12), cp = new Float32Array(N * 3), cc = new Float32Array(N * 3), col = new THREE.Color();
       for (let k = 0; k < N; k++) {
@@ -44,7 +45,8 @@ export class Asteroids {
         col.set(Math.random() < 0.25 ? COLORS.white : tint).multiplyScalar(rnd(0.5, 1.3)); cc.set([col.r, col.g, col.b], k * 3);
       }
       const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.BufferAttribute(cp, 3)); cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
-      m.add(new THREE.Points(cg, new THREE.PointsMaterial({ size: 0.9, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })));
+      m.add(new THREE.Points(cg, new THREE.PointsMaterial({ size: m.rare ? 1.3 : 0.9, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })));
+      if (m.rare) { m.halo = glowSprite(0xffffff, r * 5, 0.25); m.add(m.halo); m.ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.9, 0.12, 6, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); m.add(m.ring); }
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 12), faintEdgeMat(tint, rnd(0.18, 0.35))));
       const core = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 12, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(tint).multiplyScalar(0.9), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.add(core);

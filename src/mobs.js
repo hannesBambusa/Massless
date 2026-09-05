@@ -11,7 +11,8 @@ const MAX_BOLTS = 80;
 
 export class Mobs {
   /** sites: the site groups; wisps are few at harvest sites and swarm around rifts */
-  constructor(scene, sites) {
+  constructor(scene, sites, threat = 1) {
+    this.threat = threat;
     this.scene = scene;
     this.group = new THREE.Group(); scene.add(this.group);
     this.list = []; this.count = 0;
@@ -38,12 +39,23 @@ export class Mobs {
       for (let i = 0; i < MOB_TYPES.shoal.pack; i++) this.add('shoal', spot, st, 25);
     }
   }
+  /** a bounty: a named hunter, twice the hp, a bit faster, a guaranteed blueprint on death. One roams per system at a time. */
+  addBounty(site) {
+    const names = ['Vantablack', 'Hollow Tooth', 'The Quiet', 'Sixth Ash', 'Widow Light', 'Cinder Jaw', 'Null Hum'];
+    const kind = pick(['wisp', 'shade', 'maw']), g = this.add(kind, site.position, site);
+    g.bounty = true; g.name = `${pick(names)}, ${g.def.name.toLowerCase()} bounty`; g.hpMax = g.hp = Math.round(g.def.hp * 2.2 * this.threat); g.aggro = false; g.speedMult = 1.15;
+    g.glow.scale.multiplyScalar(1.6); g.glow.material.color.set(0xffd166);
+    const crown = glowSprite(0xffd166, 9, 0.35); g.add(crown);
+    return g;
+  }
+  /** a rift wave: `n` extra hostiles pour out of a combat site, drawn from the site's kinds */
+  wave(site, n) { for (let i = 0; i < n; i++) this.add(pick(['wisp', 'wisp', 'shade', 'shoal']), site.position, site, 120); }
   add(kind, centre, site, spread = null) {
     const def = MOB_TYPES[kind], idx = this.count++;   // running counter so names stay unique after kills and respawns
     const g = new THREE.Group();
     g.position.copy(centre).add(new THREE.Vector3(rnd(-1, 1), rnd(-0.3, 0.3), rnd(-1, 1)).normalize().multiplyScalar(spread !== null ? rnd(5, spread) : rnd(300, 520)));
     g.home = g.position.clone(); g.name = `${def.name} ${String.fromCharCode(65 + (idx % 26))}-${Math.floor(idx / 26) + 1}`; g.kind = 'mob'; g.mobKind = kind; g.def = def; g.site = site;
-    g.radius = def.radius; g.hpMax = g.hp = def.hp; g.shiver = 0; g.dead = false; g.t = rnd(0, 100); g.phase = rnd(0, TAU); g.boltT = rnd(0, 1);
+    g.radius = def.radius; g.threat = this.threat; g.hpMax = g.hp = Math.round(def.hp * this.threat); g.shiver = 0; g.dead = false; g.t = rnd(0, 100); g.phase = rnd(0, TAU); g.boltT = rnd(0, 1);
     g.dots = [];   // damage over time: { dps, left, key }
     g.hit = (dmg, lock, weapon = 'lance') => { const r = def.resist[weapon] ?? 1; g.hp = Math.max(0, g.hp - dmg * r); g.shiver = Math.max(g.shiver, lock); g.aggro = true; g.lastHit = weapon; };
     this['build_' + kind](g);
@@ -96,7 +108,8 @@ export class Mobs {
       for (let k = m.dots.length - 1; k >= 0; k--) { const d = m.dots[k]; m.hp = Math.max(0, m.hp - d.dps * dt); d.left -= dt; if (d.onTick) d.onTick(d.dps * dt); if (d.left <= 0) m.dots.splice(k, 1); }
       if (m.hp <= 0 && !m.dead) { m.dead = true; this.group.remove(m); this.list.splice(i, 1); if (onDeath) onDeath(m); continue; }
       const toShip = this._d.copy(ship.position).sub(m.position); const d = toShip.length();
-      m.aggro = m.aggro || d < def.aggro; if (d > MOB.leashRange) m.aggro = false;
+      const reach = def.aggro * (1 + (ship.heat || 0) * MOB.heatReach);   // a heavy hold draws them from further
+      m.aggro = m.aggro || d < reach; if (d > MOB.leashRange) m.aggro = false;
       m.hunting = !!m.aggro;
       m.vel = m.vel || new THREE.Vector3();
       if (m.aggro) {
@@ -104,11 +117,11 @@ export class Mobs {
         const side = this._tmp.set(-toShip.z, 0, toShip.x).normalize();
         let want;
         if (d > def.hold * 1.15) want = this._want.copy(toShip).normalize().multiplyScalar(def.speed);
-        else if (d < def.hold * 0.85) want = this._want.copy(toShip).normalize().multiplyScalar(-def.speed * 0.7);
-        else want = side.multiplyScalar(def.speed * (m.mobKind === 'shade' ? 0.9 : 0.7) * (Math.sin(m.t * 0.7 + m.phase) > 0 ? 1 : -1));
+        else if (d < def.hold * 0.85) want = this._want.copy(toShip).normalize().multiplyScalar(-def.speed * (m.speedMult || 1) * 0.7);
+        else want = side.multiplyScalar(def.speed * (m.speedMult || 1) * (m.mobKind === 'shade' ? 0.9 : 0.7) * (Math.sin(m.t * 0.7 + m.phase) > 0 ? 1 : -1));
         if (m.mobKind === 'shoal') want.add(new THREE.Vector3(Math.sin(m.t * 6 + m.phase), Math.cos(m.t * 5 + m.phase) * 0.5, Math.cos(m.t * 6.5 + m.phase)).multiplyScalar(18));
         m.vel.lerp(want, damp(m.mobKind === 'maw' ? 0.7 : 1.4, dt));
-        if (def.bite && d < def.bite) { ship.damage(def.dps * dt); m.biting = true; } else m.biting = false;
+        if (def.bite && d < def.bite) { ship.damage(def.dps * m.threat * dt); m.biting = true; } else m.biting = false;
         if (def.bolt) { m.boltT -= dt; if (m.boltT <= 0 && d < def.aggro * 1.2) { m.boltT = def.bolt.every * rnd(0.8, 1.2); this.fireBolt(m, ship); } }
       } else {
         const a = m.t * 0.25 + m.phase, goal = this._tmp.copy(m.home).add(new THREE.Vector3(Math.cos(a) * 60, Math.sin(a * 0.7) * 12, Math.sin(a) * 60));
@@ -144,7 +157,7 @@ export class Mobs {
   fireBolt(m, ship) {
     if (this.bolts.length >= MAX_BOLTS) return;
     const dir = ship.position.clone().sub(m.position).normalize();
-    this.bolts.push({ p: m.position.clone(), v: dir.multiplyScalar(m.def.bolt.speed), dmg: m.def.bolt.dmg, life: 4, len: 6 });
+    this.bolts.push({ p: m.position.clone(), v: dir.multiplyScalar(m.def.bolt.speed), dmg: m.def.bolt.dmg * m.threat, life: 4, len: 6 });
   }
   updateBolts(dt, ship) {
     for (let i = this.bolts.length - 1; i >= 0; i--) {

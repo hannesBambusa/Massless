@@ -48,7 +48,27 @@ export const MODULES = [
   mod('sol-heart',     'Sol heart',        'core',   'sol',    15, 15, 40, [flat('luminosity', 20), flat('coherence', 10)], 'A warmer core'),
   mod('ash-cinder',    'Ash cinder',       'core',   'ash',    10, 10, 25, [pct('maxSpeed', 8), pct('lanceDps', 5)], 'Restless remains'),
 ];
+for (const m of MODULES) m.base = m.id;   // a plain catalog module is its own base
 export const MODULE_BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+/** grades: the same module bound dim, bright or pure. Modifiers scale, costs do not. Grade is rolled where you bind it. */
+export const GRADES = { dim: { mult: 0.7, name: 'Dim', color: 0x7d8bb0 }, bright: { mult: 1, name: 'Bright', color: 0x9be7ff }, pure: { mult: 1.4, name: 'Pure', color: 0xffffff } };
+/** grade odds by system tier */
+export const GRADE_ODDS = { 1: { dim: 0.5, bright: 0.5 }, 2: { dim: 0.2, bright: 0.6, pure: 0.2 }, 3: { bright: 0.5, pure: 0.5 } };
+const graded = new Map();
+/** the graded variant of a catalog module: id `${base}@${grade}`; bright is the catalog module itself */
+export function gradedModule(base, grade) {
+  if (grade === 'bright') return base;
+  const id = `${base.id}@${grade}`; if (graded.has(id)) return graded.get(id);
+  const g = GRADES[grade], m = { ...base, id, base: base.id, grade, name: `${g.name} ${base.name.toLowerCase()}`, modifiers: base.modifiers.map((x) => ({ ...x, value: Math.round(x.value * g.mult * 10) / 10 })) };
+  graded.set(id, m); return m;
+}
+/** resolve any module id, graded or not */
+export function moduleById(id) { if (!id) return null; const [b, grade] = id.split('@'); const base = MODULE_BY_ID[b]; return base ? (grade ? gradedModule(base, grade) : base) : null; }
+/** a lookup object the fitting engine's deserialize can read graded ids from */
+export const MODULE_LOOKUP = new Proxy({}, { get: (_, id) => moduleById(id), has: (_, id) => !!moduleById(id) });
+/** blueprints known from the start; everything else drops */
+export const STARTER_BLUEPRINTS = ['sol-focus', 'glacis-ward', 'ember-drive', 'cerule-ear', 'sol-heart'];
 
 /** harmonic sets: fit `count` online modules of a family */
 export const SETS = [

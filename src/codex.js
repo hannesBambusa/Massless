@@ -33,6 +33,8 @@ export const CODEX = [
   ...SYSTEMS.map((s) => ({ id: `system.${s.id}`, group: 'Systems', name: s.name, color: s.star, lore: LORE.system[s.id] || '', how: `Fold to ${s.name}` })),
   { id: 'act.warp', group: 'Flight', name: 'First warp', color: 0x60a5fa, lore: 'Distance is a suggestion.', how: 'Warp to a site' },
   { id: 'act.fold', group: 'Flight', name: 'First fold', color: 0xc084fc, lore: 'The gate takes you apart and puts you back together somewhere else. Mostly.', how: 'Fold to another system' },
+  { id: 'act.bounty', group: 'Flight', name: 'First bounty', color: 0xffd166, lore: 'It had a name. Now it has a line in the log.', how: 'Unbind a bounty' },
+  { id: 'act.rift', group: 'Flight', name: 'First rift sealed', color: 0xff5f8a, lore: 'The seam closes. Something on the other side is annoyed.', how: 'Seal a rift after its last wave' },
   { id: 'act.fit', group: 'Fitting', name: 'First module', color: 0x4ff2ff, lore: 'The shell learns to carry more than itself.', how: 'Fit a module' },
   { id: 'act.harmonic', group: 'Fitting', name: 'First harmonic', color: 0xffd166, lore: 'Two of a kind sing.', how: 'Wake a harmonic set' },
   ...DESIGNS.map((d) => ({ id: `shell.${d.id}`, group: 'Shells', name: d.name, color: 0x9be7ff, lore: d.description, how: `Fly the ${d.name}` })),

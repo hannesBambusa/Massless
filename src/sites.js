@@ -67,7 +67,12 @@ export class Sites {
     return g;
   }
 
+  /** resonance: one harvest site rings for a while; yield doubles there and wisps take notice */
+  resonate(site, seconds) { this.resonance = { site, left: seconds, total: seconds }; site.resonating = true; }
+  get resonating() { return this.resonance && this.resonance.left > 0 ? this.resonance.site : null; }
+  tickResonance(dt) { if (!this.resonance) return; this.resonance.left -= dt; if (this.resonance.left <= 0) { this.resonance.site.resonating = false; this.resonance = null; } }
   update(dt, camPos) {
+    this.tickResonance(dt);
     for (const s of this.list) {
       if (!s.rings) continue;   // the gate keeps its own animation
       for (const r of s.rings) { r.rotation.z += r.spin * dt; r.rotation.x += r.spin * 0.3 * dt; }
